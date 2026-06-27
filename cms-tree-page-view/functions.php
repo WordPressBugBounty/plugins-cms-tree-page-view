@@ -122,8 +122,9 @@ function cms_tpv_add_pages() {
 		// $_GET["lang"] = $lang;
 	}
 
-	// make sure the status is publish and nothing else (yes, perhaps I named it bad elsewhere)
-	if ("published" === $post_status) $post_status = "publish";
+	// The caller-supplied status is normalized, whitelisted and gated against the
+	// post type's own publish capability below, once we have $post_type_object
+	// (see cms_tpv_resolve_new_post_status() — security todo 30, finding 2).
 
 	// remove possibly empty posts
 	$arr_post_names = array();
@@ -148,6 +149,10 @@ function cms_tpv_add_pages() {
 
 	$ok_to_continue_by_permission = TRUE;
 	$post_type_object = get_post_type_object($ref_post->post_type);
+
+	// Normalize + whitelist the requested status and enforce this post type's own
+	// publish capability (security todo 30, finding 2).
+	$post_status = cms_tpv_resolve_new_post_status( $post_status, $post_type_object );
 
 	$post_parent = 0;
 	if ("after" === $post_position) {
@@ -249,7 +254,7 @@ function cms_tpv_add_pages() {
 		$newpost_args = array(
       "menu_order" => $new_menu_order,
       "post_parent" => $post_parent_id,
-      "post_status" => ( ('publish' == $post_status) && !current_user_can('publish_posts') ? 'pending' : $post_status ),
+      "post_status" => $post_status, // already resolved via cms_tpv_resolve_new_post_status()
       "post_title" => $one_new_post_name,
       "post_type" => $ref_post->post_type,
     );
@@ -270,6 +275,43 @@ function cms_tpv_add_pages() {
 
 	exit;
 
+}
+
+/**
+ * Resolve a safe post status for a newly added page from a caller-supplied value.
+ *
+ * Security hardening for the AJAX add-page handler (todo 30, finding 2):
+ *  - normalizes the UI's "published" alias to "publish",
+ *  - whitelists the status to the values the add-page UI offers (draft, pending,
+ *    publish) so an arbitrary caller-supplied status can't be passed through to
+ *    wp_insert_post(), and
+ *  - enforces the *post type's own* publish capability (not the hardcoded core
+ *    "publish_posts"), downgrading "publish" to "pending" when the current user
+ *    may not publish that post type.
+ *
+ * @param string       $requested_status Raw status from the request (e.g. "draft", "published").
+ * @param WP_Post_Type $post_type_object The post type the page is being added to.
+ * @return string One of "draft", "pending" or "publish".
+ */
+function cms_tpv_resolve_new_post_status( $requested_status, $post_type_object ) {
+
+	// The UI sends "published" for the publish option; normalize it.
+	if ( "published" === $requested_status ) {
+		$requested_status = "publish";
+	}
+
+	// Only allow the statuses the add-page UI actually offers.
+	$allowed_statuses = array( "draft", "pending", "publish" );
+	if ( ! in_array( $requested_status, $allowed_statuses, true ) ) {
+		$requested_status = "draft";
+	}
+
+	// Enforce the post type's own publish capability.
+	if ( "publish" === $requested_status && ! current_user_can( $post_type_object->cap->publish_posts ) ) {
+		$requested_status = "pending";
+	}
+
+	return $requested_status;
 }
 
 
@@ -1317,6 +1359,16 @@ function cms_tpv_get_pages($args = null) {
 		$get_posts_args["post_status"] = "publish";
 	}
 
+	// Security: mirror core's edit.php list table — when the current user can't
+	// edit other authors' posts of this type, restrict the listing to posts they
+	// authored. Without this, a low-privileged user (e.g. a Contributor, who has
+	// the post-type `edit_posts` cap) could enumerate other authors' drafts and
+	// private posts through the tree. (todo 30, finding 1)
+	$cms_tpv_pt_obj = get_post_type_object( $get_posts_args["post_type"] );
+	if ( $cms_tpv_pt_obj && ! current_user_can( $cms_tpv_pt_obj->cap->edit_others_posts ) ) {
+		$get_posts_args["author"] = get_current_user_id();
+	}
+
 	// does not work with plugin role scoper. don't know why, but this should fix it
 	remove_action("get_pages", array('ScoperHardway', 'flt_get_pages'), 1, 2);
 
@@ -1390,14 +1442,26 @@ function cms_tpv_get_child_counts($parent_ids, $view, $post_type) {
 	$id_placeholders = implode( ",", array_fill( 0, count( $parent_ids ), "%d" ) );
 	$status_placeholders = implode( ",", array_fill( 0, count( $statuses ), "%s" ) );
 
+	// Security: match the author restriction applied in cms_tpv_get_pages() so the
+	// child count / expand arrow doesn't reveal the existence of other authors'
+	// (hidden) children to low-privileged users. (todo 30, finding 1)
+	$author_sql = "";
+	$author_params = array();
+	$cms_tpv_pt_obj = get_post_type_object( $post_type );
+	if ( $cms_tpv_pt_obj && ! current_user_can( $cms_tpv_pt_obj->cap->edit_others_posts ) ) {
+		$author_sql = " AND post_author = %d";
+		$author_params[] = get_current_user_id();
+	}
+
 	$sql = $wpdb->prepare(
 		"SELECT post_parent, COUNT(*) AS child_count
 		 FROM $wpdb->posts
 		 WHERE post_parent IN ($id_placeholders)
 		   AND post_type = %s
 		   AND post_status IN ($status_placeholders)
+		   $author_sql
 		 GROUP BY post_parent",
-		array_merge( $parent_ids, array( $post_type ), $statuses )
+		array_merge( $parent_ids, array( $post_type ), $statuses, $author_params )
 	);
 
 	$counts = array();
@@ -1624,6 +1688,103 @@ function cms_tpv_print_childs($pageID, $view = "all", $arrOpenChilds = null, $po
 	}
 }
 
+/**
+ * Find posts whose title matches a search string, for the tree search.
+ *
+ * Security (todo 30, finding 1): scoped to the given post type and, for users
+ * who cannot edit other authors' posts of that type, to posts they authored — so
+ * the tree search can't be used to enumerate other authors' draft/private content.
+ * Mirrors the author restriction in cms_tpv_get_pages().
+ *
+ * @param string $search    Title substring to search for.
+ * @param string $post_type Post type whose tree is being searched.
+ * @return array Rows with ->id and ->post_parent (empty array for an unknown post type).
+ */
+function cms_tpv_search_get_matching_posts( $search, $post_type ) {
+
+	global $wpdb;
+
+	$post_type_object = get_post_type_object( $post_type );
+	if ( empty( $post_type_object ) ) {
+		return array();
+	}
+
+	$sqlsearch = "%{$search}%";
+	$where_author = "";
+	$params = array( $post_type, $sqlsearch );
+
+	if ( ! current_user_can( $post_type_object->cap->edit_others_posts ) ) {
+		$where_author = " AND post_author = %d";
+		$params[] = get_current_user_id();
+	}
+
+	// $where_author is a fixed internal string (not user input); values are bound via $params.
+	$sql = $wpdb->prepare(
+		"SELECT id, post_parent FROM $wpdb->posts WHERE post_type = %s AND post_title LIKE %s{$where_author}",
+		$params
+	);
+
+	return $wpdb->get_results( $sql );
+}
+
+/**
+ * Resolve the ancestor node ids to open so each search hit becomes visible in
+ * the tree, scoped to what the current user is allowed to see.
+ *
+ * Security (todo 30, finding 1): for a user who can't edit other authors' posts
+ * of this type, the walk up each hit's ancestor chain is restricted to posts
+ * they authored and stops at the first ancestor they can't see — so the returned
+ * "nodes to open" list can't be used to enumerate the ids of other authors'
+ * (hidden) ancestor posts. Users with edit_others_posts are unrestricted, so the
+ * behaviour for admins/editors is unchanged.
+ *
+ * @param array  $hits      Rows from cms_tpv_search_get_matching_posts() (each with ->post_parent).
+ * @param string $post_type Post type whose tree is being searched.
+ * @return int[] Unique ancestor node ids to open (may include 0 as a top-level "has a result" marker).
+ */
+function cms_tpv_search_get_nodes_to_open( $hits, $post_type ) {
+
+	global $wpdb;
+
+	$post_type_object = get_post_type_object( $post_type );
+
+	$restrict_author_id = 0;
+	if ( $post_type_object && ! current_user_can( $post_type_object->cap->edit_others_posts ) ) {
+		$restrict_author_id = get_current_user_id();
+	}
+
+	$nodes_to_open = array();
+	foreach ( $hits as $oneHit ) {
+
+		// Top-level hit: no ancestors to open, but keep a marker so the client
+		// still registers a result (mirrors the previous behaviour).
+		if ( 0 === (int) $oneHit->post_parent ) {
+			$nodes_to_open[] = 0;
+			continue;
+		}
+
+		// Walk up the ancestor chain, stopping at the first node the user can't
+		// see (missing, or owned by another author when restricted).
+		$parentNodeID = (int) $oneHit->post_parent;
+		while ( $parentNodeID > 0 ) {
+			if ( $restrict_author_id ) {
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, post_parent FROM $wpdb->posts WHERE id = %d AND post_author = %d", $parentNodeID, $restrict_author_id ) );
+			} else {
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, post_parent FROM $wpdb->posts WHERE id = %d", $parentNodeID ) );
+			}
+
+			if ( null === $row ) {
+				break;
+			}
+
+			$nodes_to_open[] = $parentNodeID;
+			$parentNodeID = (int) $row->post_parent;
+		}
+	}
+
+	return array_unique( $nodes_to_open );
+}
+
 // Act on AJAX-call
 // Get pages
 function cms_tpv_get_childs() {
@@ -1641,45 +1802,20 @@ function cms_tpv_get_childs() {
 	// Use same capability that is required to add the menu
 	$post_type_object = get_post_type_object($post_type);
 	if ( empty( $post_type_object ) || ! current_user_can( $post_type_object->cap->edit_posts ) ) {
-		die( __( 'Cheatin&#8217; uh?' ) );
+		wp_die( __( 'Cheatin&#8217; uh?' ) ); // proper AJAX termination (matches cms_tpv_add_pages)
 	}
 
 	if ($action) {
 
 		if ($search) {
 
-			// find all pages that contains $search
-			// collect all post_parent
-			// for each parent id traverse up until post_parent is 0, saving all ids on the way
-
-			// what to search: since all we see in the GUI is the title, just search that
-			global $wpdb;
-			$sqlsearch = "%{$search}%";
-			// feels bad to leave out the "'" in the query, but prepare seems to add it..??
-			$sql = $wpdb->prepare("SELECT id, post_parent FROM $wpdb->posts WHERE post_type = 'page' AND post_title LIKE %s", $sqlsearch);
-			$hits = $wpdb->get_results($sql);
-			$arrNodesToOpen = array();
-			foreach ($hits as $oneHit) {
-				$arrNodesToOpen[] = $oneHit->post_parent;
-			}
-
-			$arrNodesToOpen = array_unique($arrNodesToOpen);
-			$arrNodesToOpen2 = array();
-			// find all parents to the arrnodestopen
-			foreach ($arrNodesToOpen as $oneNode) {
-				if ($oneNode > 0) {
-					// not at top so check it out
-					$parentNodeID = $oneNode;
-					while ($parentNodeID != 0) {
-						$sql = $wpdb->prepare("SELECT id, post_parent FROM $wpdb->posts WHERE id = %d", $parentNodeID);
-						$row = $wpdb->get_row($sql);
-						$parentNodeID = $row->post_parent;
-						$arrNodesToOpen2[] = $parentNodeID;
-					}
-				}
-			}
-
-			$arrNodesToOpen = array_merge($arrNodesToOpen, $arrNodesToOpen2);
+			// Find posts whose title matches (scoped to the current tree's post type
+			// and, for users who can't edit other authors' posts, to their own posts),
+			// then resolve the ancestor nodes to open so each hit becomes visible —
+			// both scoped so search can't enumerate other authors' unpublished content
+			// (security todo 30, finding 1).
+			$hits = cms_tpv_search_get_matching_posts( $search, $post_type );
+			$arrNodesToOpen = cms_tpv_search_get_nodes_to_open( $hits, $post_type );
 			$sReturn = "";
 			#foreach ($arrNodesToOpen as $oneNodeID) {
 			#	$sReturn .= "cms-tpv-{$oneNodeID},";
