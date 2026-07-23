@@ -16,6 +16,39 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 
 /**
+ * Example: add extra edit links to the tree's detail card.
+ *
+ * Signature: apply_filters( 'cms_tree_page_view_post_edit_links', array $links, int $page_id, WP_Post $post )
+ *
+ * Lets an integration (e.g. a page builder) contribute extra "Edit in X"
+ * links to the detail card shown for a single page. $links is the list
+ * built so far; return it with your own entries appended. Each entry is:
+ *
+ *     array( 'id' => string, 'label' => string, 'url' => string )
+ *
+ * All three keys are required — an entry missing any one of them is
+ * dropped. `id` is run through sanitize_key() (lowercased and stripped to
+ * [a-z0-9_-]) before use: it doubles as a React key and a CSS class
+ * suffix, so an id that sanitizes down to an empty string also drops the
+ * entry. `label` should already be translated by the integration — it is
+ * used as-is. `url` must be an absolute URL (e.g. built with admin_url())
+ * before it goes through esc_url_raw(): a schemeless relative URL such as
+ * 'my-builder/edit?id=7' gets 'http://' silently prepended by
+ * esc_url_raw(), producing a broken external link (a relative
+ * 'post.php?...' style URL is fine — esc_url_raw() allows the bare
+ * '^[a-z0-9-]+\.php' form).
+ *
+ * Duplicate ids collapse to the first one registered (compared after
+ * sanitize_key()), so filter priority is both the display order and the
+ * override mechanism: a lower priority number wins. The bundled Elementor
+ * integration claims the id 'elementor' at priority 10 — hook at a lower
+ * priority to take that slot instead.
+ *
+ * The filter only runs for a user who can edit the post, and only for the
+ * detail card — it is never applied per tree row.
+ */
+
+/**
  * Check if a post type is ignored.
  *
  * Back-compat shim: delegates to

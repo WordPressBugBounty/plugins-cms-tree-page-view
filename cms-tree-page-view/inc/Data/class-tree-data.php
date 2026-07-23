@@ -277,6 +277,18 @@ class Tree_Data {
 		// with the canEdit badge shown for the same post.
 		$can_edit_this = $node['canEdit'];
 
+		// Extra edit links (page builders etc.), contributed by integrations.
+		// Applied here in get_detail() and never in build_node(): the card is the
+		// only renderer, and a per-node filter would invite integrations to do a
+		// get_post_meta() lookup for every row of a level — an N+1 across the
+		// whole tree. Gated on canEdit so an integration cannot hand an editor
+		// link to a user without the capability.
+		$node['editLinks'] = $can_edit_this
+			? self::sanitize_edit_links(
+				(array) apply_filters( 'cms_tree_page_view_post_edit_links', array(), $id, $post )
+			)
+			: array();
+
 		$node['ancestors']  = $ancestors;
 		$node['excerpt']    = $can_edit_this ? (string) get_the_excerpt( $post ) : '';
 		$node['previewUrl'] = $can_edit_this
@@ -286,6 +298,67 @@ class Tree_Data {
 		$node['canDelete']  = (bool) current_user_can( $post_type_object->cap->delete_post, $id );
 
 		return $node;
+	}
+
+	/**
+	 * Validate, sanitize and de-duplicate third-party edit links.
+	 *
+	 * Entries come from a public filter, so nothing about them is trusted: each
+	 * must be an array carrying a non-empty `id`, `label` and `url`, and the url
+	 * must survive esc_url_raw() (which strips javascript: and other non-allowed
+	 * protocols). `id` is run through sanitize_key() before anything else, since
+	 * it doubles as a React key and a CSS class token; an id that sanitizes down
+	 * to '' is treated as missing. Anything else is dropped outright rather than
+	 * patched up with a default — a malformed entry degrades to "no link", never
+	 * to a broken or unsafe one.
+	 *
+	 * Duplicate ids (compared post-sanitizing) collapse to the first registered.
+	 * `id` is the React key in the detail card, so two integrations both claiming
+	 * e.g. 'elementor' would otherwise produce colliding keys — our rendering
+	 * bug, not theirs.
+	 *
+	 * @param array<mixed> $links Raw filter output.
+	 * @return list<array{id: string, label: string, url: string}>
+	 */
+	private static function sanitize_edit_links( array $links ): array {
+		$clean = array();
+		$seen  = array();
+
+		foreach ( $links as $link ) {
+			if ( ! is_array( $link ) ) {
+				continue;
+			}
+
+			// id and url are protected by sanitize_key()/esc_url_raw() below, but
+			// label is only ever cast — a non-scalar (e.g. an array) would trigger
+			// an "Array to string conversion" warning and render as the literal
+			// text "Array", so drop it here rather than let (string) coerce it.
+			if ( isset( $link['label'] ) && ! is_scalar( $link['label'] ) ) {
+				continue;
+			}
+
+			$id    = isset( $link['id'] ) ? sanitize_key( (string) $link['id'] ) : '';
+			$label = isset( $link['label'] ) ? (string) $link['label'] : '';
+			$url   = isset( $link['url'] ) ? esc_url_raw( (string) $link['url'] ) : '';
+
+			if ( '' === $id || '' === $label || '' === $url ) {
+				continue;
+			}
+
+			if ( isset( $seen[ $id ] ) ) {
+				continue;
+			}
+
+			$seen[ $id ] = true;
+
+			$clean[] = array(
+				'id'    => $id,
+				'label' => $label,
+				'url'   => $url,
+			);
+		}
+
+		return $clean;
 	}
 
 	/**

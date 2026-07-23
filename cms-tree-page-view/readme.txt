@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,12 @@ Yes. CMS Tree Page View uses WordPress' own edit links, so clicking "Edit" on a 
 
 Yes. CMS Tree Page View has been taken back over by its original author and is being actively maintained again.
 
+### Can I reorder pages on a phone or tablet?
+
+Yes — select a page and use the Move up / Move down buttons in the page's detail card.
+
+Dragging a page to a *different* level in the hierarchy (making it a child of another page) needs a mouse: it uses the browser's native drag and drop, which touch screens do not support.
+
 ## Screenshots
 
 1. Your entire site structure at a glance — every page, nested as a tree.
@@ -139,6 +145,23 @@ Yes. CMS Tree Page View has been taken back over by its original author and is b
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.2.0 (July 2026)
+
+#### Fixed
+
+- Right-click (or ⌘/Ctrl/middle-click) a page title in the tree to open its editor in a new tab again — titles are real links once more.
+
+### 2.1.0 (July 2026)
+
+#### Added
+
+- "Edit in Elementor" is back — pages built with Elementor show an editor link in the tree's detail card.
+- New `cms_tree_page_view_post_edit_links` filter lets any page builder add its own edit link to the tree.
+
+#### Fixed
+
+- The tree view is now usable on phones and small screens — it no longer overflows sideways or stretches into an endlessly tall page, and tapping a page brings its details into view.
 
 ### 2.0.0 (July 2026)
 
