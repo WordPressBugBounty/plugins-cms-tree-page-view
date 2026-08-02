@@ -56,12 +56,29 @@ class Welcome_Notice {
 		$tree_url     = \CMS_Tree_Page_View\Admin\Menu::get_tree_view_url( 'page' );
 		$settings_url = \CMS_Tree_Page_View\Admin\Menu::get_settings_url();
 
-		$message = sprintf(
-			/* translators: %1$s: link to the tree view page, on its own line, with the "Open the tree view" anchor text. %2$s: link to the settings page, with the "settings" anchor text. */
-			__( '<strong>CMS Tree Page View is ready!</strong> See all your pages as a tree — drag to reorder, plus inline edit, search, and add.<br>%1$s<br>You can choose which post types show a tree in the %2$s.', 'cms-tree-page-view' ),
-			'<a href="' . esc_url( $tree_url ) . '">' . __( 'Open the tree view &rarr;', 'cms-tree-page-view' ) . '</a>',
-			'<a href="' . esc_url( $settings_url ) . '">' . __( 'settings', 'cms-tree-page-view' ) . '</a>'
-		);
+		$settings_link = '<a href="' . esc_url( $settings_url ) . '">' . __( 'settings', 'cms-tree-page-view' ) . '</a>';
+
+		if ( '' === $tree_url ) {
+
+			// Pages are ticked in neither setting, so no tree page is registered and
+			// there is nothing to open — a link would land on WordPress's "Sorry, you
+			// are not allowed to access this page." (todo 57). Send them to settings,
+			// which is where the tree gets turned on.
+			$message = sprintf(
+				/* translators: %1$s: link to the plugin's settings page, with the "settings" anchor text. */
+				__( '<strong>CMS Tree Page View is ready!</strong> See all your pages as a tree — drag to reorder, plus inline edit, search, and add.<br>Choose which post types show a tree in the %1$s.', 'cms-tree-page-view' ),
+				$settings_link
+			);
+
+		} else {
+
+			$message = sprintf(
+				/* translators: %1$s: link to the tree view page, on its own line, with the "Open the tree view" anchor text. %2$s: link to the settings page, with the "settings" anchor text. */
+				__( '<strong>CMS Tree Page View is ready!</strong> See all your pages as a tree — drag to reorder, plus inline edit, search, and add.<br>%1$s<br>You can choose which post types show a tree in the %2$s.', 'cms-tree-page-view' ),
+				'<a href="' . esc_url( $tree_url ) . '">' . __( 'Open the tree view &rarr;', 'cms-tree-page-view' ) . '</a>',
+				$settings_link
+			);
+		}
 
 		$allowed_html = array(
 			'strong' => array(),

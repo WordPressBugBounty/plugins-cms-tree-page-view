@@ -237,6 +237,14 @@ class Tree_Data {
 			return null;
 		}
 
+		// Only describe post types the tree can actually show — an internal type
+		// (revision, attachment, nav_menu_item) has a real post-type object but
+		// would never appear as a tree node, so refuse it here too rather than
+		// hand back a detail payload for it (todo 52).
+		if ( ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $post->post_type ) ) {
+			return null;
+		}
+
 		$counts      = Legacy_Query::get_child_counts( array( $id ), 'all', $post->post_type );
 		$child_count = isset( $counts[ $id ] ) ? (int) $counts[ $id ] : 0;
 

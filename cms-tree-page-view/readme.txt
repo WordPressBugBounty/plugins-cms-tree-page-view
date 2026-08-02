@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.2.0
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -131,7 +131,7 @@ Yes. CMS Tree Page View has been taken back over by its original author and is b
 
 Yes — select a page and use the Move up / Move down buttons in the page's detail card.
 
-Dragging a page to a *different* level in the hierarchy (making it a child of another page) needs a mouse: it uses the browser's native drag and drop, which touch screens do not support.
+Dragging a page to a _different_ level in the hierarchy (making it a child of another page) needs a mouse: it uses the browser's native drag and drop, which touch screens do not support.
 
 ## Screenshots
 
@@ -145,6 +145,20 @@ Dragging a page to a *different* level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.3.0 (August 2026)
+
+#### Changed
+
+- The whole "Open full tree" footer in the dashboard widget is now clickable, including the line of text under it.
+
+#### Fixed
+
+- Dashboard widget links no longer fail with "Sorry, you do not have permission to access this page" for a post type that is enabled on the dashboard but not in the menu.
+
+#### Security
+
+- The tree's REST API now answers only for the post types the tree shows. A crafted request for a revision, attachment, or other internal post type no longer returns page details or accepts a move.
 
 ### 2.2.0 (July 2026)
 

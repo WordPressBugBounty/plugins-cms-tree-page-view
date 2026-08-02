@@ -139,8 +139,10 @@ class Tree_Controller extends WP_REST_Controller {
 			return new WP_Error( 'cms_tpv_unauthorized', __( 'You must be logged in.', 'cms-tree-page-view' ), array( 'status' => 401 ) );
 		}
 		$obj = $this->post_type_for( $request );
-		if ( ! $obj ) {
-			return new WP_Error( 'cms_tpv_bad_post_type', __( 'Unknown post type.', 'cms-tree-page-view' ), array( 'status' => 400 ) );
+		if ( ! $obj || ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $obj->name ) ) {
+			// Unknown, or a real-but-internal type the tree never shows
+			// (revision, attachment, nav_menu_item) — refuse rather than list it.
+			return new WP_Error( 'cms_tpv_bad_post_type', __( 'Unsupported post type.', 'cms-tree-page-view' ), array( 'status' => 400 ) );
 		}
 		if ( ! current_user_can( $obj->cap->edit_posts ) ) {
 			return new WP_Error( 'cms_tpv_forbidden', __( 'You are not allowed to do that.', 'cms-tree-page-view' ), array( 'status' => 403 ) );
@@ -168,6 +170,14 @@ class Tree_Controller extends WP_REST_Controller {
 		$obj = get_post_type_object( $post->post_type );
 		if ( ! $obj ) {
 			return new WP_Error( 'cms_tpv_bad_post_type', __( 'Unknown post type.', 'cms-tree-page-view' ), array( 'status' => 400 ) );
+		}
+		// The tree only manages UI-visible post types — an id belonging to an
+		// internal type (revision, attachment, nav_menu_item) is "not found" as
+		// far as the tree is concerned, even when the caller can edit_post it.
+		// Answer 404 before the cap check so the detail endpoint never returns a
+		// payload for an object the tree would never list (todo 52).
+		if ( ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $post->post_type ) ) {
+			return new WP_Error( 'cms_tpv_not_found', __( 'Page not found.', 'cms-tree-page-view' ), array( 'status' => 404 ) );
 		}
 		// Per-post, not per-type: edit_posts alone only proves the user may edit
 		// *some* post of this type, not this specific one — WP's edit_post meta

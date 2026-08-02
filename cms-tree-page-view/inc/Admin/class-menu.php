@@ -278,6 +278,59 @@ class Menu {
 	}
 
 	/**
+	 * Whether this post type has a Tree View page registered at all.
+	 *
+	 * Single source of truth for "is cms-tpv-page-{$post_type} a page WordPress
+	 * knows about" — add_admin_menu() registers exactly this set, and
+	 * get_tree_view_url() refuses to hand out a URL outside it. Keeping the two
+	 * on one predicate is what stops the plugin linking to a page core never
+	 * registered, which wp-admin/admin.php answers with "Sorry, you are not
+	 * allowed to access this page." for every role, administrators included
+	 * (todo 57).
+	 *
+	 * Only the "In menu" setting registers the page. Ticking a post type "On
+	 * dashboard" asks for the widget, not for a screen — so its rows link to each
+	 * page's own editor instead of deep-linking into a tree that isn't there.
+	 *
+	 * @param string $post_type Post type slug.
+	 * @return bool
+	 */
+	public static function has_tree_view_page( $post_type ) {
+
+		$options = \CMS_Tree_Page_View\Settings\Options::get();
+
+		if ( ! in_array( $post_type, $options['menu'], true ) ) {
+			return false;
+		}
+
+		if ( \CMS_Tree_Page_View\Settings\Options::is_post_type_ignored( $post_type ) ) {
+			return false;
+		}
+
+		$post_type_object = get_post_type_object( $post_type );
+
+		if ( empty( $post_type_object ) ) {
+			return false;
+		}
+
+		// No admin menu to attach to (show_ui/show_in_menu false) means there is
+		// nowhere to register the page, so it has none.
+		return '' !== self::get_post_type_menu_parent( $post_type_object );
+	}
+
+	/**
+	 * Every post type that gets a Tree View page, in settings order.
+	 *
+	 * @return string[] Post type slugs.
+	 */
+	public static function get_tree_view_post_types() {
+
+		$options = \CMS_Tree_Page_View\Settings\Options::get();
+
+		return array_values( array_filter( $options['menu'], array( __CLASS__, 'has_tree_view_page' ) ) );
+	}
+
+	/**
 	 * Build the URL of a post type's Tree View submenu page, mirroring how
 	 * WordPress core itself builds submenu URLs (wp-admin/menu-header.php) for
 	 * the parent cms_tpv_get_post_type_menu_parent() returns.
@@ -299,15 +352,16 @@ class Menu {
 	 */
 	public static function get_tree_view_url( $post_type ) {
 
-		$post_type_object = get_post_type_object( $post_type );
-		if ( ! $post_type_object ) {
+		// A URL to a page add_admin_menu() never registered is worse than no URL
+		// at all: WordPress answers it with "Sorry, you are not allowed to access
+		// this page." Callers get '' instead and are expected to degrade.
+		if ( ! self::has_tree_view_page( $post_type ) ) {
 			return '';
 		}
 
+		$post_type_object = get_post_type_object( $post_type );
+
 		$parent_slug = self::get_post_type_menu_parent( $post_type_object );
-		if ( '' === $parent_slug ) {
-			return '';
-		}
 
 		$file_part = explode( '?', $parent_slug, 2 )[0];
 		if ( ! file_exists( ABSPATH . 'wp-admin/' . $file_part ) ) {
@@ -335,37 +389,22 @@ class Menu {
 	 */
 	public static function admin_menu() {
 
-		// Add.
-		$options = \CMS_Tree_Page_View\Settings\Options::get();
+		// has_tree_view_page() has already dropped ignored post types, unregistered
+		// ones, and ones with no admin menu to attach to (show_in_menu=false: skip
+		// rather than orphan the submenu / clobber another plugin's item — todo 21).
+		foreach ( self::get_tree_view_post_types() as $one_post_type ) {
 
-		foreach ( $options['menu'] as $one_menu_post_type ) {
+			$post_type_object = get_post_type_object( $one_post_type );
 
-			if ( \CMS_Tree_Page_View\Settings\Options::is_post_type_ignored( $one_menu_post_type ) ) {
-				continue;
-			}
+			// Attach the Tree View under the post type's ACTUAL admin menu location
+			// (honoring show_in_menu), not a hardcoded edit.php?post_type=… parent.
+			$slug = self::get_post_type_menu_parent( $post_type_object );
 
-			$post_type_object = get_post_type_object( $one_menu_post_type );
+			$menu_name = _x( 'Tree View', 'name in menu', 'cms-tree-page-view' );
+			/* translators: %1$s: the post type's plural name (e.g. "Pages"). */
+			$page_title = sprintf( _x( '%1$s Tree View', 'title on page with tree', 'cms-tree-page-view' ), $post_type_object->labels->name );
 
-			// Only try to add menu if we got a valid post type object
-			// I think you can get a notice message here if you for example have enabled
-			// the menu for a custom post type that you later on remove?
-			if ( ! empty( $post_type_object ) ) {
-
-				// Attach the Tree View under the post type's ACTUAL admin menu location
-				// (honoring show_in_menu), not a hardcoded edit.php?post_type=… parent.
-				// An empty parent means the post type has no menu to attach to — skip it
-				// rather than orphan the submenu / clobber another plugin's item (todo 21).
-				$slug = self::get_post_type_menu_parent( $post_type_object );
-				if ( '' === $slug ) {
-					continue;
-				}
-
-				$menu_name = _x( 'Tree View', 'name in menu', 'cms-tree-page-view' );
-				/* translators: %1$s: the post type's plural name (e.g. "Pages"). */
-				$page_title = sprintf( _x( '%1$s Tree View', 'title on page with tree', 'cms-tree-page-view' ), $post_type_object->labels->name );
-				add_submenu_page( $slug, $page_title, $menu_name, $post_type_object->cap->edit_posts, "cms-tpv-page-$one_menu_post_type", 'cms_tpv_pages_page' );
-
-			}
+			add_submenu_page( $slug, $page_title, $menu_name, $post_type_object->cap->edit_posts, "cms-tpv-page-$one_post_type", 'cms_tpv_pages_page' );
 		}
 
 		$page_title = apply_filters( 'cms_tree_page_view_options_page_title', CMS_TPV_NAME );

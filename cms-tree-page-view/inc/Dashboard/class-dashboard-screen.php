@@ -81,12 +81,24 @@ class Dashboard_Screen {
 		// build/style-index.css has applied — instead of briefly collapsing to a
 		// sliver until the CSS (and then React) catches up.
 		printf(
-			'<div class="%1$s" data-post-type="%2$s" style="min-height:140px"><noscript><a href="%3$s">%4$s</a></noscript></div>',
+			'<div class="%1$s" data-post-type="%2$s" style="min-height:140px">',
 			esc_attr( self::ROOT_CLASS ),
-			esc_attr( $post_type ),
-			esc_url( $tree_url ),
-			esc_html__( 'Open full tree', 'cms-tree-page-view' )
+			esc_attr( $post_type )
 		);
+
+		// Without the post type ticked "In menu" there is no Tree View page to open,
+		// so the fallback link is dropped rather than rendered with an empty href
+		// that reloads the dashboard (todo 57). The React app handles the same case
+		// by linking each row to its own editor instead.
+		if ( '' !== $tree_url ) {
+			printf(
+				'<noscript><a href="%1$s">%2$s</a></noscript>',
+				esc_url( $tree_url ),
+				esc_html__( 'Open full tree', 'cms-tree-page-view' )
+			);
+		}
+
+		echo '</div>';
 	}
 
 	/**

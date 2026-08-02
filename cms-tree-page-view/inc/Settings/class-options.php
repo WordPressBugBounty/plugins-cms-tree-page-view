@@ -96,6 +96,42 @@ class Options {
 	}
 
 	/**
+	 * Whether the plugin can manage a tree for this post type at all: a UI-visible
+	 * post type that isn't the media library or on the ignore list. This is the
+	 * single source of truth for that set — both the settings screen (which offers
+	 * it as toggleable) and the REST allowlist run through here, so the two can't
+	 * drift.
+	 *
+	 * WordPress's internal post types — `revision`, `nav_menu_item` — register with
+	 * show_ui=false and so are excluded, and `attachment` is skipped explicitly.
+	 * So the tree, detail, and write endpoints never describe or mutate an object
+	 * the tree itself would never list (a revision, an attachment), no matter what
+	 * id or post_type a crafted request supplies. It is deliberately the structural
+	 * "could show" set rather than the currently-toggled dashboard/menu subset: the
+	 * only ids the UI ever sends already come from the tree, and gating on the
+	 * toggled subset would 404 a perfectly editable type a user simply hasn't
+	 * enabled yet, without closing any disclosure the caps don't already gate.
+	 *
+	 * @param string $post_type Post type slug.
+	 * @return bool
+	 */
+	public static function is_manageable_post_type( $post_type ) {
+		$post_type = (string) $post_type;
+
+		if ( 'attachment' === $post_type ) {
+			return false;
+		}
+
+		if ( self::is_post_type_ignored( $post_type ) ) {
+			return false;
+		}
+
+		$object = get_post_type_object( $post_type );
+
+		return ! empty( $object ) && ! empty( $object->show_ui );
+	}
+
+	/**
 	 * Persist the settings form on admin_init (self-handled Post/Redirect/Get).
 	 */
 	public static function save() {
@@ -158,14 +194,12 @@ class Options {
 
 						foreach ( $post_types as $one_post_type ) {
 
-							if ( self::is_post_type_ignored( $one_post_type->name ) ) {
-								continue;
-							}
-
 							$name = $one_post_type->name;
 
-							// Posts are intentionally supported (enabled 2011); only media/attachments are skipped.
-							if ( $name === 'attachment' ) {
+							// Same rule the REST allowlist uses (posts are intentionally
+							// supported since 2011; only media/attachments and ignored
+							// types are skipped) — one predicate so the two never drift.
+							if ( ! self::is_manageable_post_type( $name ) ) {
 								continue;
 							}
 

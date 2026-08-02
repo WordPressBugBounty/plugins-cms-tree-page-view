@@ -161,7 +161,7 @@ class Mutation_Controller extends WP_REST_Controller {
 	 */
 	private function user_can_edit_post( $post ) {
 		$obj = get_post_type_object( $post->post_type );
-		if ( ! $obj ) {
+		if ( ! $obj || ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $post->post_type ) ) {
 			return false;
 		}
 		return (bool) apply_filters(
@@ -261,7 +261,7 @@ class Mutation_Controller extends WP_REST_Controller {
 	 */
 	private function user_can_add_page( $ref, $position ) {
 		$obj = get_post_type_object( $ref->post_type );
-		if ( ! $obj ) {
+		if ( ! $obj || ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $ref->post_type ) ) {
 			return false;
 		}
 		if ( 'inside' === $position && ! $this->post_type_supports_children( $ref->post_type ) ) {
@@ -326,7 +326,7 @@ class Mutation_Controller extends WP_REST_Controller {
 		// to further restrict page creation isn't silently bypassed here.
 		$post_type = (string) $request->get_param( 'postType' );
 		$obj       = $post_type ? get_post_type_object( $post_type ) : null;
-		if ( ! $obj ) {
+		if ( ! $obj || ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $post_type ) ) {
 			return new WP_Error( 'cms_tpv_bad_post_type', __( 'Unknown post type.', 'cms-tree-page-view' ), array( 'status' => 400 ) );
 		}
 		$can = current_user_can( $obj->cap->create_posts );
@@ -420,6 +420,12 @@ class Mutation_Controller extends WP_REST_Controller {
 		$obj = get_post_type_object( $post->post_type );
 		if ( ! $obj ) {
 			return new WP_Error( 'cms_tpv_bad_post_type', __( 'Unknown post type.', 'cms-tree-page-view' ), array( 'status' => 400 ) );
+		}
+
+		// An id of an internal type the tree never lists (revision, attachment,
+		// nav_menu_item) is "not found" for trashing, mirroring the read endpoint.
+		if ( ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $post->post_type ) ) {
+			return new WP_Error( 'cms_tpv_not_found', __( 'Page not found.', 'cms-tree-page-view' ), array( 'status' => 404 ) );
 		}
 
 		if ( ! current_user_can( $obj->cap->delete_post, $post->ID ) ) {
