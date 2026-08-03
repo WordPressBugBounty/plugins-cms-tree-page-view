@@ -6,6 +6,13 @@ WordPress.org shows on the plugin page). Each entry appears in only one
 place — the newest in readme.txt, everything older here — so there is no
 duplicate log to keep in sync.
 
+### 1.7.1 (June 2026)
+
+#### Security
+
+- The tree and its search now show each user only the posts and pages they are allowed to see, matching WordPress' built-in posts and pages screens. Users who cannot edit other people's content (such as Contributors) no longer see — or find by searching — other authors' drafts in the tree.
+- When adding pages, the plugin now respects who is allowed to publish. If a user cannot publish a given post type, their new page is saved as "Pending review" instead of being published.
+
 ### 1.7.0 (June 2026)
 
 The plugin is now maintained by its original author again and is being modernized. This release focuses on security and compatibility with current WordPress and PHP.

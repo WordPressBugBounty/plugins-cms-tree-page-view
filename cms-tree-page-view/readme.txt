@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.3.0
+Stable tag: 2.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -146,6 +146,23 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 
 ## Changelog
 
+### 2.3.1 (August 2026)
+
+#### Added
+
+- Password-protected pages are marked with a padlock again, in the tree, the dashboard widget, and the page details card.
+
+#### Fixed
+
+- Users who can only edit their own pages see the tree again. It lists every published page plus their own drafts, instead of coming up empty.
+- The status filter tabs count the pages the tree actually shows, so a tab can no longer say "All (18)" above an empty tree.
+- Page titles in the tree no longer carry the front-end "Protected:" and "Private:" prefixes.
+- The tree no longer offers a drag or an "Add page after" on a page you cannot edit, where the action could only fail.
+
+#### Security
+
+- Adding a page after another page now requires permission to edit that page, since it renumbers the pages around it.
+
 ### 2.3.0 (August 2026)
 
 #### Changed
@@ -213,15 +230,8 @@ If you hate it: [leave feedback in the support forum](https://wordpress.org/supp
 
 - Removed the bundled WPML / Sitepress integration (I was unable to test and maintain this since I don't use WPML myself).
 
-### 1.7.1 (June 2026)
-
-#### Security
-
-- The tree and its search now show each user only the posts and pages they are allowed to see, matching WordPress' built-in posts and pages screens. Users who cannot edit other people's content (such as Contributors) no longer see — or find by searching — other authors' drafts in the tree.
-- When adding pages, the plugin now respects who is allowed to publish. If a user cannot publish a given post type, their new page is saved as "Pending review" instead of being published.
-
 ### Older versions
 
-The changelog for all previous releases (1.7.0 and earlier, back to the first release in 2010) is in [changelog.txt](changelog.txt), included with the plugin.
+The changelog for all previous releases (1.7.1 and earlier, back to the first release in 2010) is in [changelog.txt](changelog.txt), included with the plugin.
 
 ysaetf7ruhjnm3e2x4tbtletpc35ckeb

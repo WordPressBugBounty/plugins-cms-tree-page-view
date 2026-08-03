@@ -161,9 +161,14 @@ class Tree_Data {
 				current_user_can( $post_type_object->cap->create_posts, $page_id ),
 				$page_id
 			),
+			// "After" also renumbers this page's siblings to make room, so it needs
+			// edit_post on this page on top of create_posts — mirroring
+			// Mutation_Controller::user_can_add_page(), or the card would offer an
+			// action the server then refuses.
 			'canAddAfter'         => (bool) apply_filters(
 				'cms_tree_page_view_post_user_can_add_after',
-				current_user_can( $post_type_object->cap->create_posts, $page_id ),
+				current_user_can( $post_type_object->cap->create_posts, $page_id )
+					&& current_user_can( $post_type_object->cap->edit_post, $page_id ),
 				$page_id
 			),
 		);
@@ -171,21 +176,105 @@ class Tree_Data {
 
 	/**
 	 * A post's display title, prepared the one way the tree renders titles:
-	 * get_the_title() + the plugin's title filter, entity-decoded so React
-	 * escapes it exactly once (no double-encoding), with the legacy untitled
-	 * fallback. Shared by build_node() and context_node().
+	 * admin_title() (see below — deliberately not get_the_title()) + the plugin's
+	 * title filter, entity-decoded so React escapes it exactly once (no
+	 * double-encoding), with the legacy untitled fallback. Shared by build_node(),
+	 * context_node() and get_detail()'s breadcrumb.
 	 *
 	 * @param \WP_Post $post Post.
 	 * @return string
 	 */
 	private static function node_title( \WP_Post $post ): string {
-		$title = get_the_title( $post->ID );
+		$title = self::admin_title( $post );
 		$title = apply_filters( 'cms_tree_page_view_post_title', $title, $post );
 		$title = html_entity_decode( $title, ENT_QUOTES, get_bloginfo( 'charset' ) );
 		if ( empty( $title ) ) {
 			$title = __( '<Untitled page>', 'cms-tree-page-view' );
 		}
 		return $title;
+	}
+
+	/**
+	 * A post's title the way wp-admin renders it — without the "Protected: " and
+	 * "Private: " prefixes.
+	 *
+	 * Those prefixes are a front-end display convention. get_the_title() adds them
+	 * (via the protected_title_format / private_title_format filters), and core
+	 * skips that whole branch inside wp-admin behind an is_admin() guard. The tree
+	 * fetches its titles over the REST API, where is_admin() is false — so the
+	 * guard doesn't fire and an admin screen ends up listing "Protected: Our Team"
+	 * and "Private: Privacy Policy". The pre-React version, which built its nodes
+	 * in an admin-ajax request, never showed them.
+	 *
+	 * The tree states both facts in its own vocabulary anyway — a padlock for a
+	 * password, a status badge for private — so the prefix is redundant on top of
+	 * being out of place.
+	 *
+	 * Strip the prefix branch by skipping it: with it gone, get_the_title() is
+	 * just `apply_filters( 'the_title', … )`, so calling that directly IS the
+	 * admin rendering. (Core's own docblocks on protected_title_format /
+	 * private_title_format say "the filter is only applied on the front end" —
+	 * this reproduces that.) The alternative, temporarily filtering both formats
+	 * to '%s' around a get_the_title() call, needs a closure, matching add/remove
+	 * priorities, and care that nothing else runs inside the window; this needs
+	 * none of it and leaves no global state to restore.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return string
+	 */
+	private static function admin_title( \WP_Post $post ): string {
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Not our hook to name: this re-applies core's own `the_title`, the last thing get_the_title() does, so titles keep passing through whatever a theme or plugin has hooked there.
+		return (string) apply_filters( 'the_title', $post->post_title, $post->ID );
+	}
+
+	/**
+	 * A post's excerpt the way wp-admin would show it — without the front-end
+	 * password gate.
+	 *
+	 * Same family of problem as admin_title(), one function up: a front-end
+	 * courtesy leaking into an admin screen. get_the_excerpt() answers the fixed
+	 * string "There is no excerpt because this is a protected post." whenever
+	 * post_password_required() is true — and that check reads the visitor's
+	 * `wp-postpass_` cookie with no capability bypass, so it fires for an editor
+	 * reading the tree exactly as it would for a logged-out visitor. This field is
+	 * already gated on that editor being able to edit the post; someone who can
+	 * open the page in the editor does not need its excerpt kept from them.
+	 *
+	 * Unlike admin_title(), inlining the useful half of core's function is not
+	 * enough here: the gate appears three times over. get_the_excerpt() checks it,
+	 * and so does get_the_content() — which wp_trim_excerpt() calls to build the
+	 * fallback excerpt from the content — where it swaps the whole body for the
+	 * password *form*. Reproducing core around each one would mean owning more of
+	 * core's excerpt pipeline than is wise.
+	 *
+	 * They all read one root condition, so flip that instead, for the length of
+	 * the call: post_password_required() is answering "must this viewer type a
+	 * password to read the post?", and for an editor building an admin preview the
+	 * honest answer is no. Everything downstream — the trim fallback, the
+	 * `the_content` and `get_the_excerpt` filters a theme may have hooked — then
+	 * behaves exactly as it does for an unprotected post.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return string
+	 */
+	private static function admin_excerpt( \WP_Post $post ): string {
+		$not_required = static function () {
+			return false;
+		};
+
+		add_filter( 'post_password_required', $not_required, PHP_INT_MAX );
+
+		// finally, because get_the_excerpt() runs the whole excerpt → trim →
+		// the_content chain, i.e. arbitrary third-party hooks. If one of them
+		// throws, leaving this filter hooked would answer "no password needed"
+		// for every post for the rest of the request.
+		try {
+			$excerpt = get_the_excerpt( $post );
+		} finally {
+			remove_filter( 'post_password_required', $not_required, PHP_INT_MAX );
+		}
+
+		return (string) $excerpt;
 	}
 
 	/**
@@ -263,7 +352,10 @@ class Tree_Data {
 			}
 			$ancestors[] = array(
 				'id'      => (int) $anc_id,
-				'title'   => (string) apply_filters( 'cms_tree_page_view_post_title', get_the_title( $anc_id ), $anc_post ),
+				// node_title(), not a hand-rolled copy of it: a breadcrumb crumb and
+				// the tree row for the same page must read identically, down to the
+				// entity decoding and the untitled fallback.
+				'title'   => self::node_title( $anc_post ),
 				'editUrl' => (string) get_edit_post_link( $anc_id, 'raw' ),
 			);
 		}
@@ -298,7 +390,7 @@ class Tree_Data {
 			: array();
 
 		$node['ancestors']  = $ancestors;
-		$node['excerpt']    = $can_edit_this ? (string) get_the_excerpt( $post ) : '';
+		$node['excerpt']    = $can_edit_this ? self::admin_excerpt( $post ) : '';
 		$node['previewUrl'] = $can_edit_this
 			? (string) add_query_arg( 'cms_tpv_preview', '1', get_preview_post_link( $post ) )
 			: '';
@@ -383,9 +475,9 @@ class Tree_Data {
 	 * Flat list of nodes whose title matches a search term, scoped to the
 	 * post type and the current user's read permission.
 	 *
-	 * Mirrors the author restriction in cms_tpv_get_pages(): when the user cannot
-	 * edit others' posts of this type, the query is limited to their own posts so
-	 * a low-privileged user cannot enumerate other authors' drafts via search.
+	 * Applies the same visibility rule as the level listing (Post_Visibility): a
+	 * user who cannot edit others' posts of this type still finds published
+	 * pages, but not other authors' drafts or private posts.
 	 *
 	 * @param string $post_type Post type.
 	 * @param string $term      Raw search term.
@@ -406,23 +498,23 @@ class Tree_Data {
 		}
 
 		$query_args = array(
-			'post_type'      => $post_type,
-			's'              => $term,
+			'post_type'                => $post_type,
+			's'                        => $term,
 			// Match the page title only — the tree shows titles, so a content-only
 			// match would paint a row yellow with nothing visibly highlighted.
-			'search_columns' => array( 'post_title' ),
-			'post_status'    => self::searchable_statuses(),
-			'fields'         => 'ids',
-			'posts_per_page' => 100,
-			'orderby'        => 'title',
-			'order'          => 'ASC',
-			'no_found_rows'  => true,
-		);
+			'search_columns'           => array( 'post_title' ),
+			'post_status'              => self::searchable_statuses(),
+			'fields'                   => 'ids',
+			'posts_per_page'           => 100,
+			'orderby'                  => 'title',
+			'order'                    => 'ASC',
+			'no_found_rows'            => true,
 
-		// Author restriction — identical rule to cms_tpv_get_pages().
-		if ( ! current_user_can( $post_type_object->cap->edit_others_posts ) ) {
-			$query_args['author'] = get_current_user_id();
-		}
+			// Visibility — the same rule the level listing applies, enforced in SQL
+			// here because the 100-result cap would otherwise be spent on rows the
+			// user can't see (Post_Visibility::filter_posts_where()).
+			Post_Visibility::QUERY_VAR => $post_type,
+		);
 
 		$ids = ( new \WP_Query( $query_args ) )->posts;
 		return self::matches_with_ancestors( $ids, $post_type_object );
@@ -453,12 +545,16 @@ class Tree_Data {
 		}
 
 		$query_args = array(
-			'post_type'      => $post_type,
-			'fields'         => 'ids',
-			'posts_per_page' => self::FILTER_RESULT_LIMIT,
-			'orderby'        => 'title',
-			'order'          => 'ASC',
-			'no_found_rows'  => true,
+			'post_type'                => $post_type,
+			'fields'                   => 'ids',
+			'posts_per_page'           => self::FILTER_RESULT_LIMIT,
+			'orderby'                  => 'title',
+			'order'                    => 'ASC',
+			'no_found_rows'            => true,
+
+			// Visibility — the same rule the level listing applies. 'mine' scopes
+			// itself to the current user below; this clause is a no-op for it.
+			Post_Visibility::QUERY_VAR => $post_type,
 		);
 
 		switch ( $view ) {
@@ -477,12 +573,6 @@ class Tree_Data {
 				break;
 			default:
 				return array();
-		}
-
-		// Author restriction — identical rule to cms_tpv_get_pages() / search_nodes
-		// ('mine' already scopes to the current user above).
-		if ( 'mine' !== $view && ! current_user_can( $post_type_object->cap->edit_others_posts ) ) {
-			$query_args['author'] = get_current_user_id();
 		}
 
 		$ids = ( new \WP_Query( $query_args ) )->posts;
@@ -619,50 +709,79 @@ class Tree_Data {
 	}
 
 	/**
-	 * Per-status counts for the status-filter tabs, scoped to what the current
-	 * user may read (wp_count_posts '...readable' applies the author restriction).
+	 * Per-status counts for the status-filter tabs, using the same visibility
+	 * rule as the listing so a tab can never advertise pages the tree won't
+	 * render (todo 59).
+	 *
+	 * One grouped query answers both dimensions: the per-status totals, and how
+	 * many of each are the current user's own (the "mine" tab). This replaced
+	 * wp_count_posts( …, 'readable' ) plus a second WP_Query — 'readable' counts
+	 * other authors' drafts, which is exactly the mismatch this fixes. The cost
+	 * is losing wp_count_posts()'s cached entry for one indexed GROUP BY, which
+	 * is the right trade for counts that agree with the screen.
 	 *
 	 * @param string $post_type Post type.
 	 * @return array<string,int> { all, mine, publish, draft, pending, trash }
 	 */
 	public static function get_status_counts( string $post_type ): array {
-		$counts = wp_count_posts( $post_type, 'readable' );
+		global $wpdb;
 
-		$publish = isset( $counts->publish ) ? (int) $counts->publish : 0;
-		$draft   = isset( $counts->draft ) ? (int) $counts->draft : 0;
-		$pending = isset( $counts->pending ) ? (int) $counts->pending : 0;
-		$trash   = isset( $counts->trash ) ? (int) $counts->trash : 0;
+		$empty = array(
+			'all'     => 0,
+			'mine'    => 0,
+			'publish' => 0,
+			'draft'   => 0,
+			'pending' => 0,
+			'trash'   => 0,
+		);
 
-		// "all" = every status the tree's default 'any' listing shows: all
-		// registered statuses except trash and auto-draft.
-		$all = 0;
-		foreach ( (array) $counts as $status => $n ) {
-			if ( 'trash' === $status || 'auto-draft' === $status ) {
-				continue;
-			}
-			$all += (int) $n;
+		$post_type_object = get_post_type_object( $post_type );
+
+		if ( empty( $post_type_object ) ) {
+			return $empty;
 		}
 
-		// "mine" = the current user's posts of this type in any non-trash status.
-		$mine_q = new \WP_Query(
-			array(
-				'post_type'      => $post_type,
-				'author'         => get_current_user_id(),
-				'post_status'    => self::searchable_statuses(),
-				'fields'         => 'ids',
-				'posts_per_page' => 1,
-				'no_found_rows'  => false,
-			)
+		list( $visibility_sql, $visibility_params ) = Post_Visibility::where_sql( $post_type_object, $wpdb->posts );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The only interpolated part is the placeholder-only fragment from Post_Visibility::where_sql(); every value is bound through the prepare() args array. The replacement count can't be read statically: the args arrive as one array_merge() whose tail comes from where_sql(), and the fragment contributing the matching placeholders is interpolated. $wpdb->posts is a core table name, and this per-request roll-up is deliberately uncached.
+		$sql = $wpdb->prepare(
+			"SELECT post_status, COUNT(*) AS total, SUM( post_author = %d ) AS mine
+			 FROM {$wpdb->posts}
+			 WHERE post_type = %s
+			   AND post_status <> 'auto-draft'
+			   {$visibility_sql}
+			 GROUP BY post_status",
+			array_merge( array( get_current_user_id(), $post_type ), $visibility_params )
 		);
-		$mine   = (int) $mine_q->found_posts;
+
+		$rows = $wpdb->get_results( $sql );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		$per_status = array();
+		$all        = 0;
+		$mine       = 0;
+
+		foreach ( $rows as $row ) {
+			$status = (string) $row->post_status;
+			$total  = (int) $row->total;
+
+			$per_status[ $status ] = $total;
+
+			// "all" mirrors the base tree's 'any' listing: every status except
+			// trash (auto-draft is already excluded by the query).
+			if ( 'trash' !== $status ) {
+				$all  += $total;
+				$mine += (int) $row->mine;
+			}
+		}
 
 		return array(
 			'all'     => $all,
 			'mine'    => $mine,
-			'publish' => $publish,
-			'draft'   => $draft,
-			'pending' => $pending,
-			'trash'   => $trash,
+			'publish' => isset( $per_status['publish'] ) ? $per_status['publish'] : 0,
+			'draft'   => isset( $per_status['draft'] ) ? $per_status['draft'] : 0,
+			'pending' => isset( $per_status['pending'] ) ? $per_status['pending'] : 0,
+			'trash'   => isset( $per_status['trash'] ) ? $per_status['trash'] : 0,
 		);
 	}
 

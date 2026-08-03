@@ -268,9 +268,25 @@ class Mutation_Controller extends WP_REST_Controller {
 			return false;
 		}
 		$can = current_user_can( $obj->cap->create_posts, $ref->ID );
+
 		if ( 'inside' === $position ) {
+			// "Inside" only appends among the reference's children; it never
+			// renumbers the reference or its siblings. Core lets anyone who may
+			// create a page choose any published page as its parent (the Page
+			// Attributes dropdown lists exactly those), so create_posts is the
+			// right and only gate here.
 			return (bool) apply_filters( 'cms_tree_page_view_post_user_can_add_inside', $can, $ref->ID );
 		}
+
+		// "After" places the new page among the reference's siblings and bumps
+		// their menu_order to make room (Tree_Mutations::add_pages()) — a write
+		// against a level the caller may not own. create_posts doesn't prove that
+		// right, so require edit_post on the reference as well, the same demand
+		// POST /move makes of both its nodes. This matters since todo 59: the
+		// tree lists other authors' published pages, so the card offers "Add
+		// page → After" on them.
+		$can = $can && current_user_can( $obj->cap->edit_post, $ref->ID );
+
 		return (bool) apply_filters( 'cms_tree_page_view_post_user_can_add_after', $can, $ref->ID );
 	}
 

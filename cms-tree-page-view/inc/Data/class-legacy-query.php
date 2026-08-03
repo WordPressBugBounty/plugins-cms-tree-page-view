@@ -185,16 +185,6 @@ class Legacy_Query {
 			$get_posts_args['post_status'] = 'publish';
 		}
 
-		// Security: mirror core's edit.php list table — when the current user can't
-		// edit other authors' posts of this type, restrict the listing to posts they
-		// authored. Without this, a low-privileged user (e.g. a Contributor, who has
-		// the post-type `edit_posts` cap) could enumerate other authors' drafts and
-		// private posts through the tree. (todo 30, finding 1).
-		$cms_tpv_pt_obj = get_post_type_object( $get_posts_args['post_type'] );
-		if ( $cms_tpv_pt_obj && ! current_user_can( $cms_tpv_pt_obj->cap->edit_others_posts ) ) {
-			$get_posts_args['author'] = get_current_user_id();
-		}
-
 		// Does not work with plugin role scoper. Don't know why, but this should fix it.
 		remove_action( 'get_pages', array( 'ScoperHardway', 'flt_get_pages' ), 1 );
 
@@ -202,6 +192,32 @@ class Legacy_Query {
 		remove_filter( 'get_pages', 'ALO_exclude_page' );
 
 		$pages = get_posts( $get_posts_args );
+
+		// Drop anything the current user may not see (todo 30 finding 1, reworked
+		// for todo 59). This filters the result rather than the query because
+		// get_posts() runs with suppress_filters => true, so Post_Visibility's
+		// posts_where clause cannot reach it — and flipping that flag would newly
+		// expose the tree to every third-party posts_* filter on the site. The
+		// listing is unpaginated (numberposts => -1), so filtering here drops
+		// exactly the hidden rows and never truncates the visible ones.
+		$cms_tpv_pt_obj = get_post_type_object( $get_posts_args['post_type'] );
+
+		if ( $cms_tpv_pt_obj && Post_Visibility::is_restricted( $cms_tpv_pt_obj ) ) {
+			// One query to prime, so the per-post check below reads from cache
+			// instead of firing a get_post() query per row.
+			_prime_post_caches( $pages, false, false );
+
+			$pages = array_values(
+				array_filter(
+					$pages,
+					static function ( $page_id ) use ( $cms_tpv_pt_obj ) {
+						$post = get_post( $page_id );
+
+						return $post && Post_Visibility::can_see_post( $post, $cms_tpv_pt_obj );
+					}
+				)
+			);
+		}
 
 		// Apply the standard WordPress get_pages filter so other plugins can adjust the list.
 		// Note: get_pages filter uses orderby comma separated and with the key sort_column.
@@ -273,15 +289,15 @@ class Legacy_Query {
 		$id_placeholders     = implode( ',', array_fill( 0, count( $parent_ids ), '%d' ) );
 		$status_placeholders = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
 
-		// Security: match the author restriction applied in cms_tpv_get_pages() so the
-		// child count / expand arrow doesn't reveal the existence of other authors'
-		// (hidden) children to low-privileged users. (todo 30, finding 1).
-		$author_sql     = '';
-		$author_params  = array();
-		$cms_tpv_pt_obj = get_post_type_object( $post_type );
-		if ( $cms_tpv_pt_obj && ! current_user_can( $cms_tpv_pt_obj->cap->edit_others_posts ) ) {
-			$author_sql      = ' AND post_author = %d';
-			$author_params[] = get_current_user_id();
+		// Match the listing's visibility rule exactly, so the expand arrow and the
+		// "(N)" badge never promise children the user can't see (todo 30 finding 1,
+		// reworked for todo 59).
+		$visibility_sql    = '';
+		$visibility_params = array();
+		$cms_tpv_pt_obj    = get_post_type_object( $post_type );
+
+		if ( $cms_tpv_pt_obj ) {
+			list( $visibility_sql, $visibility_params ) = Post_Visibility::where_sql( $cms_tpv_pt_obj, $wpdb->posts );
 		}
 
 		// This direct aggregate query is safe and intentional (audited in todo 32): the
@@ -296,9 +312,9 @@ class Legacy_Query {
 			 WHERE post_parent IN ($id_placeholders)
 			   AND post_type = %s
 			   AND post_status IN ($status_placeholders)
-			   $author_sql
+			   $visibility_sql
 			 GROUP BY post_parent",
-			array_merge( $parent_ids, array( $post_type ), $statuses, $author_params )
+			array_merge( $parent_ids, array( $post_type ), $statuses, $visibility_params )
 		);
 
 		$counts = array();

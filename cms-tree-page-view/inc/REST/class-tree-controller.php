@@ -179,12 +179,25 @@ class Tree_Controller extends WP_REST_Controller {
 		if ( ! \CMS_Tree_Page_View\Settings\Options::is_manageable_post_type( $post->post_type ) ) {
 			return new WP_Error( 'cms_tpv_not_found', __( 'Page not found.', 'cms-tree-page-view' ), array( 'status' => 404 ) );
 		}
-		// Per-post, not per-type: edit_posts alone only proves the user may edit
-		// *some* post of this type, not this specific one — WP's edit_post meta
-		// cap additionally maps to edit_others_posts/read_private_posts for a
-		// post that isn't the caller's own, matching the author-scoping this
-		// plugin already enforces elsewhere (e.g. Tree_Data::search_nodes()).
-		if ( ! current_user_can( $obj->cap->edit_post, $post->ID ) ) {
+		// Two gates, the same pair the tree listing applies — the type, then the
+		// row.
+		//
+		// Type first: the caller must be able to edit *some* post of this type,
+		// exactly as get_items_permissions_check() requires before listing one.
+		// Without it, deriving the type from the post would let anyone pull node
+		// data for a CPT they hold no capability for at all, just by knowing an
+		// id — a published post on a restricted CPT is still that CPT's.
+		if ( ! current_user_can( $obj->cap->edit_posts ) ) {
+			return new WP_Error( 'cms_tpv_forbidden', __( 'You are not allowed to do that.', 'cms-tree-page-view' ), array( 'status' => 403 ) );
+		}
+
+		// Then the row: the same visibility rule the listing uses (todo 59), so
+		// anything the tree shows can also be selected. This is deliberately
+		// looser than the old per-post edit_post check — everything sensitive in
+		// the payload (excerpt, previewUrl, editLinks) stays gated on the node's
+		// own canEdit inside get_detail(), so a page the user may read but not
+		// edit yields a read-only card instead of an error.
+		if ( ! \CMS_Tree_Page_View\Data\Post_Visibility::can_see_post( $post, $obj ) ) {
 			return new WP_Error( 'cms_tpv_forbidden', __( 'You are not allowed to do that.', 'cms-tree-page-view' ), array( 'status' => 403 ) );
 		}
 		return true;
