@@ -17,6 +17,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Tree_Data {
 
 	/**
+	 * The contributed actions a tree ROW should show, from the same filter the
+	 * detail card uses.
+	 *
+	 * Only entries that opted in with position 'row' or 'both' are returned.
+	 * The default is 'card', which is what keeps an integration that predates
+	 * this feature — Elementor's, for one — from suddenly drawing an icon on
+	 * every row of every level without anyone asking for it.
+	 *
+	 * @param int      $page_id Post ID.
+	 * @param \WP_Post $post    Post object.
+	 * @return list<array<string,string>>
+	 */
+	private static function row_links( int $page_id, \WP_Post $post ): array {
+		$links = self::sanitize_edit_links(
+			(array) apply_filters( 'cms_tree_page_view_post_edit_links', array(), $page_id, $post )
+		);
+
+		$rows = array();
+
+		foreach ( $links as $link ) {
+			if ( in_array( $link['position'], array( 'row', 'both' ), true ) ) {
+				$rows[] = $link;
+			}
+		}
+
+		return $rows;
+	}
+
+	/**
 	 * Build node data for one tree level.
 	 *
 	 * @param array $args { post_type, parent (0=root), view }.
@@ -133,6 +162,12 @@ class Tree_Data {
 
 		$modified_ts = strtotime( $post->post_modified );
 
+		$can_edit = (bool) apply_filters(
+			'cms_tree_page_view_post_can_edit',
+			current_user_can( $post_type_object->cap->edit_post, $page_id ),
+			$page_id
+		);
+
 		return array(
 			'id'                  => $page_id,
 			'title'               => $title,
@@ -151,11 +186,24 @@ class Tree_Data {
 			),
 			'author'              => self::modified_author( $post ),
 			'isPasswordProtected' => '' !== $post->post_password,
-			'canEdit'             => (bool) apply_filters(
-				'cms_tree_page_view_post_can_edit',
-				current_user_can( $post_type_object->cap->edit_post, $page_id ),
-				$page_id
-			),
+			'canEdit'             => $can_edit,
+			// A draft, a pending submission or a scheduled page has no public URL
+			// yet, so the row's second action offers a PREVIEW instead of a view.
+			// Gated on canEdit because WordPress gates preview links on the
+			// capability — get_detail() has always gated its own previewUrl the
+			// same way.
+			'previewUrl'          => $can_edit
+				? (string) add_query_arg( 'cms_tpv_preview', '1', get_preview_post_link( $post ) )
+				: '',
+			// Actions contributed by integrations (page builders, Simple History)
+			// that asked to appear on the ROW rather than only in the detail card.
+			// The N+1 this comment used to warn about does not apply: get_tree()
+			// calls _prime_post_caches( $page_ids, false, true ) before this loop,
+			// so an integration's get_post_meta() is a cache hit. What is left is
+			// the integration's own per-row work, which is why it must opt in.
+			'editLinks'           => $can_edit
+				? self::row_links( $page_id, $post )
+				: array(),
 			'canAddInside'        => Legacy_Query::is_post_type_hierarchical( $post_type_object ) && (bool) apply_filters(
 				'cms_tree_page_view_post_user_can_add_inside',
 				current_user_can( $post_type_object->cap->create_posts, $page_id ),
@@ -417,8 +465,12 @@ class Tree_Data {
 	 * e.g. 'elementor' would otherwise produce colliding keys — our rendering
 	 * bug, not theirs.
 	 *
+	 * `icon` and `position` are optional and both close-ended: an unknown
+	 * position falls back to 'card', which is what stops an integration that
+	 * predates row actions from appearing on every row unasked.
+	 *
 	 * @param array<mixed> $links Raw filter output.
-	 * @return list<array{id: string, label: string, url: string}>
+	 * @return list<array{id: string, label: string, url: string, icon: string, position: string}>
 	 */
 	private static function sanitize_edit_links( array $links ): array {
 		$clean = array();
@@ -451,10 +503,26 @@ class Tree_Data {
 
 			$seen[ $id ] = true;
 
+			// The icon is a NAME resolved client-side against a set the plugin
+			// ships, never markup: an SVG string from a filter would have to be
+			// kses'd against an SVG allowlist on every row, and a URL to an image
+			// could not inherit currentColor. A single character is a lettermark
+			// (the builder's initial), which is why length 1 is allowed through
+			// unchanged rather than passed to sanitize_key().
+			$icon = isset( $link['icon'] ) && is_scalar( $link['icon'] ) ? (string) $link['icon'] : '';
+			$icon = 1 === strlen( $icon ) ? $icon : sanitize_key( $icon );
+
+			$position = isset( $link['position'] ) ? sanitize_key( (string) $link['position'] ) : '';
+			if ( ! in_array( $position, array( 'row', 'card', 'both' ), true ) ) {
+				$position = 'card';
+			}
+
 			$clean[] = array(
-				'id'    => $id,
-				'label' => $label,
-				'url'   => $url,
+				'id'       => $id,
+				'label'    => $label,
+				'url'      => $url,
+				'icon'     => $icon,
+				'position' => $position,
 			);
 		}
 

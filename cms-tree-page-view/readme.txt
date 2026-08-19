@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.3.1
+Stable tag: 2.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -146,6 +146,26 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 
 ## Changelog
 
+### 2.4.0 (August 2026)
+
+#### Added
+
+- Edit and View icons on every row of the tree and the dashboard widget, shown when you hover or focus a page.
+- A page-history icon on each row when Simple History is installed, opening that page's own history.
+- Drafts and pending pages offer Preview where a published page offers View.
+- Press `e` or `v` on the focused page to edit or view it.
+- Page builders and other plugins can add their own row icon through the `cms_tree_page_view_post_edit_links` filter.
+- A one-time tip after your first reorder suggests Simple History for tracking who changed what, if it is not already installed.
+
+#### Changed
+
+- Pages you cannot edit show their title in a muted grey, so you can see what is yours without clicking.
+- The selected page's card now makes the full case for Simple History when it is missing, naming the page you picked.
+
+#### Fixed
+
+- A page you cannot edit no longer shows a pointer cursor as though its title were a link.
+
 ### 2.3.1 (August 2026)
 
 #### Added
@@ -193,42 +213,6 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 #### Fixed
 
 - The tree view is now usable on phones and small screens — it no longer overflows sideways or stretches into an endlessly tall page, and tapping a page brings its details into view.
-
-### 2.0.0 (July 2026)
-
-A big, friendly refresh of the whole plugin.
-
-I hope you will like this update.
-If you like it: [leave a nice review](https://wordpress.org/support/plugin/cms-tree-page-view/reviews/#new-post) :)
-If you hate it: [leave feedback in the support forum](https://wordpress.org/support/plugin/cms-tree-page-view/) so I know what to improve!
-
-#### Added
-
-- Optional Simple History integration — see who changed what, right in the tree.
-- Full keyboard navigation — arrow keys to move around, "/" to search, "?" for the shortcut list.
-- Select a page to see its details and quick actions (edit, view, add, reorder) beside the tree.
-- Drag to create: drop the new-page item anywhere in the tree and the page is created right there — right parent, right position.
-- A friendly welcome note after activating the plugin points you straight to your tree.
-
-#### Changed
-
-- Rebuilt the entire tree interface to be faster and easier to use.
-- The dashboard widget is now a light, glanceable quick-nav card — click a page to jump straight to its editor, or open the full tree in one click. The editing tools live on the Tree View screen, so your dashboard stays fast and tidy.
-- The pages list screen got a clean List / Tree switch at the top — flip between WordPress' regular list and the tree with one click (this replaces the old option that embedded the tree inside the list screen).
-- Now requires WordPress 6.6 or later.
-- Adding several pages at once is now as simple as typing one title per line and pressing Enter.
-- Tightened permission and security checks across the tree.
-- The tree sidebar and settings screen now show a small "About this plugin" card with support, review, and Simple History links, replacing the old dismissible promo boxes.
-- Made the settings page easier to find: a Plugins-screen "Settings" link, a link in the tree sidebar's About card, and a mention in the welcome notice.
-
-#### Fixed
-
-- Reordering now saves the correct order on sites with a persistent object cache (Redis, Memcached); previously a drag could leave several pages sharing one order value.
-- The Tree View menu item no longer overwrites other plugins' admin menu items when a post type's menu lives in a custom location ([report](https://wordpress.org/support/topic/plugin-overwriting-search-and-filter-pro-menu-on-admin/)).
-
-#### Removed
-
-- Removed the bundled WPML / Sitepress integration (I was unable to test and maintain this since I don't use WPML myself).
 
 ### Older versions
 
