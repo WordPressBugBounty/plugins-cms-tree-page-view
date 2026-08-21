@@ -5,9 +5,9 @@ Donate link: https://eskapism.se/sida/donate/
 Tags: reorder pages, page order, drag-and-drop, custom post types, tree view
 Text Domain: cms-tree-page-view
 Requires at least: 6.6
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -42,10 +42,11 @@ If you also run [Simple History](https://simple-history.com/?utm_source=cms-tree
 - Drag and drop to reorder and renest
 - Drag a brand-new page straight into the tree to create it exactly where it belongs
 - Add a page after or inside another — or a whole batch at once
-- Edit, view and search, all in place
+- Edit or view any page straight from its row: hover a page and the icons appear, or press "e" or "v"
+- Search the whole tree without leaving the screen
 - Full keyboard navigation, so your hands can stay on the keys
 - A tree right on your dashboard, ready the moment you log in
-- See who moved, edited or added a page, right beside the tree — when the free Simple History plugin is installed
+- See who moved, edited or added a page, right beside the tree, plus a history icon on every row — when the free Simple History plugin is installed
 - Works with pages, posts, products and any custom content type — hierarchical or not
 
 #### Showing this order on your site
@@ -145,6 +146,19 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.4.1 (August 2026)
+
+#### Changed
+
+- Posts can no longer be dropped inside other posts, which WordPress itself gives you no way to do.
+- Posts nested by an earlier version still show that way in the tree, and can be dragged back out.
+
+#### Fixed
+
+- Reordering by drag-and-drop now works in the tree of a non-hierarchical custom post type.
+- Dragging a new page in from the "Add pages" box works there too.
+- The tree no longer loads forever when the server doesn't answer; it now says so and offers a retry.
 
 ### 2.4.0 (August 2026)
 

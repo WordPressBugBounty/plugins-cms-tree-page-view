@@ -16,17 +16,26 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 
 /**
- * Example: add extra edit links to the tree's detail card.
+ * Example: add extra actions to a page's row actions and detail card.
  *
  * Signature: apply_filters( 'cms_tree_page_view_post_edit_links', array $links, int $page_id, WP_Post $post )
  *
  * Lets an integration (e.g. a page builder) contribute extra "Edit in X"
- * links to the detail card shown for a single page. $links is the list
- * built so far; return it with your own entries appended. Each entry is:
+ * entries to a page's ROW ACTIONS — the Edit / View / history icons that
+ * appear after the title when a tree or dashboard-widget row is hovered or
+ * focused — and to the detail card shown for a single selected page.
+ * $links is the list built so far; return it with your own entries
+ * appended. Each entry is:
  *
- *     array( 'id' => string, 'label' => string, 'url' => string )
+ *     array(
+ *         'id'       => string, // required
+ *         'label'    => string, // required
+ *         'url'      => string, // required
+ *         'icon'     => string, // optional
+ *         'position' => string, // optional: 'card' (default), 'row' or 'both'
+ *     )
  *
- * All three keys are required — an entry missing any one of them is
+ * id, label and url are required — an entry missing any one of them is
  * dropped. `id` is run through sanitize_key() (lowercased and stripped to
  * [a-z0-9_-]) before use: it doubles as a React key and a CSS class
  * suffix, so an id that sanitizes down to an empty string also drops the
@@ -38,14 +47,30 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 'post.php?...' style URL is fine — esc_url_raw() allows the bare
  * '^[a-z0-9-]+\.php' form).
  *
+ * `icon` is the NAME of an icon the plugin ships, resolved client-side,
+ * never markup: an SVG string from a filter would have to be kses'd
+ * against an allowlist on every row, and an image URL could not inherit
+ * currentColor. A single character is kept as-is and drawn as a
+ * lettermark, which is the escape hatch for a builder with no shipped
+ * icon — pass its initial.
+ *
+ * `position` decides where the entry appears: 'card' (the default, and
+ * what an unknown value falls back to) is the detail card only, 'row' is
+ * the row actions only, 'both' is both. Defaulting to 'card' is what keeps
+ * an integration written before row actions existed — the bundled
+ * Elementor one, for example — from suddenly drawing an icon on every row
+ * of every level without anyone asking for it. Row entries are built for
+ * every visible node of a level, so keep an opted-in callback cheap; the
+ * post caches are primed first, so get_post_meta() is a cache hit, but the
+ * integration's own per-row work is not.
+ *
  * Duplicate ids collapse to the first one registered (compared after
  * sanitize_key()), so filter priority is both the display order and the
  * override mechanism: a lower priority number wins. The bundled Elementor
  * integration claims the id 'elementor' at priority 10 — hook at a lower
  * priority to take that slot instead.
  *
- * The filter only runs for a user who can edit the post, and only for the
- * detail card — it is never applied per tree row.
+ * Both surfaces only run the filter for a user who can edit the post.
  */
 
 /**

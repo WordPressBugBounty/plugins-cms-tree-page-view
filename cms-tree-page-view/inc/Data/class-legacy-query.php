@@ -81,18 +81,27 @@ class Legacy_Query {
 	}
 
 	/**
-	 * Determine if a post type is considered hierarchical
+	 * Whether a post type may hold parent/child relationships — i.e. whether the
+	 * tree should offer "make child" drops and "add inside" on its nodes.
+	 *
+	 * Simply what the post type itself declares. Until todo 71 this fake-treated
+	 * `post` as hierarchical, inherited from the pre-takeover plugin: dropping a
+	 * post onto another post wrote a post_parent that WordPress offers no UI for
+	 * (`post` doesn't even support page-attributes) and reads nowhere — not in
+	 * permalinks, the template hierarchy, or the Posts list table. The nesting
+	 * existed only inside this plugin's tree, where it also took the dragged post
+	 * off the top level, so a stray mid-row drop could make a post look lost.
+	 *
+	 * This governs what may be WRITTEN, not what is DISPLAYED: the tree is built
+	 * from post_parent regardless (see get_pages()), so posts that were nested
+	 * while the old rule applied still render as children and can be dragged back
+	 * out.
 	 *
 	 * @param \WP_Post_Type $post_type_object The post type object to inspect.
 	 * @return bool True if the post type is treated as hierarchical.
 	 */
 	public static function is_post_type_hierarchical( $post_type_object ) {
-		$is_hierarchical = $post_type_object->hierarchical;
-		// Special case for posts, fake-support hierarchical.
-		if ( 'post' === $post_type_object->name ) {
-			$is_hierarchical = true;
-		}
-		return $is_hierarchical;
+		return (bool) $post_type_object->hierarchical;
 	}
 
 	/**
