@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.5.0
+Stable tag: 2.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,13 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.5.1 (August 2026)
+
+#### Fixed
+
+- Sites running Simple History older than 5.27.0 no longer hit a fatal error on every page tree screen.
+- The Simple History logger is no longer registered on Simple History 3.x and older, where loading it crashed the site.
 
 ### 2.5.0 (August 2026)
 

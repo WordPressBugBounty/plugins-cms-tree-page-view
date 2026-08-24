@@ -44,7 +44,10 @@ class Simple_History_Integration {
 	 * @return array<mixed>
 	 */
 	public static function add_history_link( array $links, int $page_id ): array {
-		if ( ! class_exists( '\Simple_History\Helpers' ) ) {
+		// class_exists() alone is not enough: Helpers has existed since Simple
+		// History 4.0, but get_filtered_history_url() only landed in 5.27.0. On
+		// anything older the class guard passed and the call below fatalled.
+		if ( ! method_exists( '\Simple_History\Helpers', 'get_filtered_history_url' ) ) {
 			return $links;
 		}
 
@@ -56,6 +59,7 @@ class Simple_History_Integration {
 			return $links;
 		}
 
+		// @phpstan-ignore staticMethod.notFound (Simple History 5.27.0+ only, guarded above)
 		$url = \Simple_History\Helpers::get_filtered_history_url(
 			array( 'context' => 'post_id:' . $page_id )
 		);

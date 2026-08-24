@@ -15,10 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Third-party Simple History logger for this plugin's tree mutations.
  *
- * Registered via the `simple_history/add_custom_logger` action (see index.php) —
- * that action only fires when Simple History is active, so this class is only
- * ever loaded/instantiated when its base class exists. No other code in this
- * plugin needs a class_exists() guard for it.
+ * Registered via the `simple_history/add_custom_logger` action (see index.php),
+ * which only fires when Simple History is active. That action predates the
+ * namespaced base class below by several major versions, so index.php also
+ * checks \Simple_History\Loggers\Logger (4.0+) exists before registering —
+ * otherwise an older Simple History autoloads this file and fatals on the
+ * missing parent. Nothing else in the plugin may reference this class.
  */
 class Simple_History_Logger extends \Simple_History\Loggers\Logger {
 

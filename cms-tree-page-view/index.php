@@ -4,7 +4,7 @@
  * Plugin URI: https://eskapism.se/code-playground/cms-tree-page-view/
  * Description: Adds a CMS-like tree view of all your pages, like the view often found in a page-focused CMS. Use the tree view to edit, view, add pages and search pages (very useful if you have many pages). And with drag and drop you can rearrange the order of your pages. Page management won't get any easier than this!
  * Text Domain: cms-tree-page-view
- * Version: 2.5.0
+ * Version: 2.5.1
  * Requires at least: 6.6
  * Requires PHP: 7.4
  * Author: Pär Thernström
@@ -35,7 +35,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CMS_TPV_VERSION', '2.5.0' );
+define( 'CMS_TPV_VERSION', '2.5.1' );
 define( 'CMS_TPV_NAME', 'CMS Tree Page View' );
 
 require __DIR__ . '/functions.php';
@@ -53,9 +53,18 @@ add_action(
 // Simple History (https://simple-history.com/) is an optional dependency: this
 // action is only fired by Simple History itself, so registration is a no-op
 // (and the logger class is never loaded) when it isn't installed/active.
+//
+// The action has fired since Simple History 2.1, but Simple_History_Logger
+// extends \Simple_History\Loggers\Logger, which only exists from 4.0. Without
+// the guard below, registering on an older Simple History autoloads our class
+// and fatals on the missing parent — so check the parent, not the action.
 add_action(
 	'simple_history/add_custom_logger',
 	function ( $simple_history ) {
+		if ( ! class_exists( '\\Simple_History\\Loggers\\Logger' ) ) {
+			return;
+		}
+
 		$simple_history->register_logger( 'CMS_Tree_Page_View\\Integrations\\Simple_History_Logger' );
 	}
 );
