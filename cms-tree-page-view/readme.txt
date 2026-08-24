@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.4.1
+Stable tag: 2.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,7 @@ If you also run [Simple History](https://simple-history.com/?utm_source=cms-tree
 - Drag a brand-new page straight into the tree to create it exactly where it belongs
 - Add a page after or inside another — or a whole batch at once
 - Edit or view any page straight from its row: hover a page and the icons appear, or press "e" or "v"
+- See a live preview of any page right beside the tree, without opening it
 - Search the whole tree without leaving the screen
 - Full keyboard navigation, so your hands can stay on the keys
 - A tree right on your dashboard, ready the moment you log in
@@ -136,7 +137,7 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 
 ## Screenshots
 
-1. Your entire site structure at a glance — every page, nested as a tree.
+1. Your entire site structure at a glance — every page nested as a tree, with a live preview of the page you select.
 2. Select any page to edit, view, add a child, or reorder it — right from the tree.
 3. Add several pages at once — type one title per line, as drafts or published.
 4. Find any page instantly with built-in search.
@@ -146,6 +147,22 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.5.0 (August 2026)
+
+#### Added
+
+- The page details panel now shows a live preview of the selected page, rendered at desktop width.
+- "Simple History" in the page history heading now links to simple-history.com.
+
+#### Fixed
+
+- A long page title in the dashboard widget no longer leaves the page icon, padlock and status badge stranded halfway down the row.
+- A page title with no spaces in it, such as a pasted URL, no longer stretches the tree screen sideways or pushes the dashboard widget's badges off the card.
+- Preview on a page of a non-public post type no longer opens a WordPress admin screen instead of the page.
+- The tree no longer stretches across the whole screen on a wide monitor, leaving the page details stranded far to the right.
+- The buttons on the page details panel now fit on one row on a laptop, instead of pushing the reorder arrows onto a second line.
+- A narrow browser window no longer squeezes the tree down to a couple of hundred pixels.
 
 ### 2.4.1 (August 2026)
 

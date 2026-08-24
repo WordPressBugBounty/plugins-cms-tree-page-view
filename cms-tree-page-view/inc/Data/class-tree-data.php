@@ -46,6 +46,33 @@ class Tree_Data {
 	}
 
 	/**
+	 * The front-end preview URL for a post, marked so Admin\Menu can drop the
+	 * admin bar from the render — or '' when there is nothing to preview.
+	 *
+	 * The empty case is the point. get_preview_post_link() returns '' for a post
+	 * type that is not publicly viewable (public => false with show_ui => true is
+	 * a normal shape for an internal content type, and Options::is_manageable_post_type()
+	 * happily offers such a type a tree). Passing that '' straight to
+	 * add_query_arg() does NOT give back '' — it gives '?cms_tpv_preview=1', a
+	 * relative URL that a browser resolves against whatever page it is on. Fed to
+	 * the detail card's preview iframe that loads the current admin screen inside
+	 * the card; fed to a row's preview action it links back into wp-admin. Callers
+	 * test this for emptiness, so it has to actually be empty.
+	 *
+	 * @param \WP_Post $post Post to build the link for.
+	 * @return string Absolute preview URL, or '' when the type has no front end.
+	 */
+	private static function preview_url( \WP_Post $post ): string {
+		$link = (string) get_preview_post_link( $post );
+
+		if ( '' === $link ) {
+			return '';
+		}
+
+		return (string) add_query_arg( 'cms_tpv_preview', '1', $link );
+	}
+
+	/**
 	 * Build node data for one tree level.
 	 *
 	 * @param array $args { post_type, parent (0=root), view }.
@@ -192,9 +219,7 @@ class Tree_Data {
 			// Gated on canEdit because WordPress gates preview links on the
 			// capability — get_detail() has always gated its own previewUrl the
 			// same way.
-			'previewUrl'          => $can_edit
-				? (string) add_query_arg( 'cms_tpv_preview', '1', get_preview_post_link( $post ) )
-				: '',
+			'previewUrl'          => $can_edit ? self::preview_url( $post ) : '',
 			// Actions contributed by integrations (page builders, Simple History)
 			// that asked to appear on the ROW rather than only in the detail card.
 			// The N+1 this comment used to warn about does not apply: get_tree()
@@ -439,9 +464,7 @@ class Tree_Data {
 
 		$node['ancestors']  = $ancestors;
 		$node['excerpt']    = $can_edit_this ? self::admin_excerpt( $post ) : '';
-		$node['previewUrl'] = $can_edit_this
-			? (string) add_query_arg( 'cms_tpv_preview', '1', get_preview_post_link( $post ) )
-			: '';
+		$node['previewUrl'] = $can_edit_this ? self::preview_url( $post ) : '';
 		$node['template']   = (string) $template;
 		$node['canDelete']  = (bool) current_user_can( $post_type_object->cap->delete_post, $id );
 
