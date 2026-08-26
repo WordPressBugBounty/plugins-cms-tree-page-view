@@ -43,17 +43,17 @@ class Tree_Controller extends WP_REST_Controller {
 					'callback'            => array( $this, 'get_items' ),
 					'permission_callback' => array( $this, 'get_items_permissions_check' ),
 					'args'                => array(
-						'post_type' => array(
+						'cms_tpv_post_type' => array(
 							'type'              => 'string',
 							'default'           => 'page',
 							'sanitize_callback' => 'sanitize_key',
 						),
-						'parent'    => array(
+						'parent'            => array(
 							'type'              => 'integer',
 							'default'           => 0,
 							'sanitize_callback' => 'absint',
 						),
-						'view'      => array(
+						'view'              => array(
 							'type'    => 'string',
 							'default' => 'all',
 							// 'all_with_trash' is the base tree behind the Trash filter
@@ -61,12 +61,12 @@ class Tree_Controller extends WP_REST_Controller {
 							// matches have a real tree row to render in (see Tree.jsx).
 							'enum'    => array( 'all', 'all_with_trash', 'mine', 'publish', 'draft', 'pending', 'trash' ),
 						),
-						'search'    => array(
+						'cms_tpv_search'    => array(
 							'type'              => 'string',
 							'default'           => '',
 							'sanitize_callback' => 'sanitize_text_field',
 						),
-						'filter'    => array(
+						'filter'            => array(
 							'type'    => 'string',
 							'default' => '',
 							// 'all' (and '') are accepted but treated as "no filter" —
@@ -87,7 +87,7 @@ class Tree_Controller extends WP_REST_Controller {
 					'callback'            => array( $this, 'get_counts' ),
 					'permission_callback' => array( $this, 'get_items_permissions_check' ),
 					'args'                => array(
-						'post_type' => array(
+						'cms_tpv_post_type' => array(
 							'type'              => 'string',
 							'default'           => 'page',
 							'sanitize_callback' => 'sanitize_key',
@@ -124,7 +124,7 @@ class Tree_Controller extends WP_REST_Controller {
 	 * @return \WP_Post_Type|null
 	 */
 	private function post_type_for( WP_REST_Request $request ) {
-		$post_type = $request->get_param( 'post_type' );
+		$post_type = $request->get_param( 'cms_tpv_post_type' );
 		return $post_type ? get_post_type_object( $post_type ) : null;
 	}
 
@@ -154,7 +154,7 @@ class Tree_Controller extends WP_REST_Controller {
 	 * Permission for a single page request.
 	 *
 	 * Derives the post type from the post itself — never from a request param —
-	 * to prevent a caller from bypassing the cap check by passing ?post_type=page.
+	 * to prevent a caller from bypassing the cap check by passing ?cms_tpv_post_type=page.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return true|WP_Error
@@ -210,7 +210,7 @@ class Tree_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function get_items( $request ) {
-		$search = (string) $request->get_param( 'search' );
+		$search = (string) $request->get_param( 'cms_tpv_search' );
 		if ( '' !== trim( $search ) ) {
 			$obj  = $this->post_type_for( $request );
 			$type = $obj ? $obj->name : 'page';
@@ -230,7 +230,7 @@ class Tree_Controller extends WP_REST_Controller {
 
 		$nodes = Tree_Data::get_nodes(
 			array(
-				'post_type' => $request->get_param( 'post_type' ),
+				'post_type' => $request->get_param( 'cms_tpv_post_type' ),
 				'parent'    => (int) $request->get_param( 'parent' ),
 				'view'      => $request->get_param( 'view' ),
 			)

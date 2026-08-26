@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.5.1
+Stable tag: 2.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,12 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.5.2 (August 2026)
+
+#### Fixed
+
+- A custom post type's tree could fail to load when a theme or plugin's own routing reacted to `post_type` in the URL; the REST API now uses non-colliding parameter names.
 
 ### 2.5.1 (August 2026)
 

@@ -44,17 +44,17 @@ class Activity_Controller extends WP_REST_Controller {
 					'callback'            => array( $this, 'get_items' ),
 					'permission_callback' => array( $this, 'get_items_permissions_check' ),
 					'args'                => array(
-						'post_type' => array(
+						'cms_tpv_post_type' => array(
 							'type'              => 'string',
 							'default'           => 'page',
 							'sanitize_callback' => 'sanitize_key',
 						),
-						'post'      => array(
+						'post'              => array(
 							'type'              => 'integer',
 							'default'           => 0,
 							'sanitize_callback' => 'absint',
 						),
-						'per_page'  => array(
+						'per_page'          => array(
 							'type'              => 'integer',
 							'default'           => 8,
 							'sanitize_callback' => 'absint',
@@ -82,7 +82,7 @@ class Activity_Controller extends WP_REST_Controller {
 		if ( ! is_user_logged_in() ) {
 			return new WP_Error( 'cms_tpv_unauthorized', __( 'You must be logged in.', 'cms-tree-page-view' ), array( 'status' => 401 ) );
 		}
-		$obj = get_post_type_object( sanitize_key( (string) $request->get_param( 'post_type' ) ) );
+		$obj = get_post_type_object( sanitize_key( (string) $request->get_param( 'cms_tpv_post_type' ) ) );
 		if ( ! $obj ) {
 			return new WP_Error( 'cms_tpv_bad_post_type', __( 'Unknown post type.', 'cms-tree-page-view' ), array( 'status' => 400 ) );
 		}
@@ -130,7 +130,7 @@ class Activity_Controller extends WP_REST_Controller {
 
 		$items = $post
 			? Activity_Reader::for_post( $post, $per_page )
-			: Activity_Reader::recent( $per_page, (string) $request->get_param( 'post_type' ) );
+			: Activity_Reader::recent( $per_page, (string) $request->get_param( 'cms_tpv_post_type' ) );
 
 		return rest_ensure_response(
 			array(
