@@ -347,6 +347,9 @@ class Menu {
 	 *   core always routes submenus under those through `admin.php?page=`,
 	 *   never `<parent-slug>?page=`.
 	 *
+	 * Public API: Simple SEO calls this (behind is_callable()) for the "Page
+	 * tree" link under its Simple History events. Keep the name and signature.
+	 *
 	 * @param string $post_type Post type slug.
 	 * @return string Admin URL, or '' when the post type has no Tree View menu.
 	 */

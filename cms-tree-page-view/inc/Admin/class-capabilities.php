@@ -12,38 +12,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Grants and removes the custom move capability (CMS_TPV_MOVE_PERMISSION) on the
- * roles that are allowed to reorder the tree.
+ * The retired tree-move capability (CMS_TPV_MOVE_PERMISSION).
+ *
+ * It was meant to gate reordering, but nothing has checked it for years:
+ * reordering is gated by edit_post (REST\Mutation_Controller), and on new
+ * installs the capability was never even granted (todo 84). So it is no
+ * longer granted, and remove() takes it off every role on upgrade and on
+ * uninstall, including roles a site owner once gave it to by hand.
  */
 class Capabilities {
 
 	/**
-	 * Roles that receive the tree-move capability.
+	 * Used to grant the tree-move capability. Kept as a no-op: the old
+	 * cms_tvp_setup_caps() shim pointed callers here from 2.0.0 to 2.5.2.
 	 *
-	 * @return array<string, string[]> Role name => capabilities to grant.
-	 */
-	private static function role_caps() {
-		return array(
-			'administrator' => array( CMS_TPV_MOVE_PERMISSION ),
-			'editor'        => array( CMS_TPV_MOVE_PERMISSION ),
-		);
-	}
-
-	/**
-	 * Grant the tree-move capability to the administrator and editor roles.
+	 * @deprecated 2.6.0 The capability is retired; no replacement.
 	 */
 	public static function setup() {
-		foreach ( self::role_caps() as $role => $caps ) {
-			self::add_caps_to_role( $role, $caps );
-		}
+		_deprecated_function( __METHOD__, '2.6.0' );
 	}
 
 	/**
-	 * Remove the tree-move capability from the administrator and editor roles.
+	 * Remove the retired tree-move capability from every role that has it.
 	 */
 	public static function remove() {
-		foreach ( self::role_caps() as $role => $caps ) {
-			self::remove_caps_from_role( $role, $caps );
+		foreach ( array_keys( wp_roles()->roles ) as $role ) {
+			self::remove_caps_from_role( $role, array( CMS_TPV_MOVE_PERMISSION ) );
 		}
 	}
 

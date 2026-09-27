@@ -462,6 +462,17 @@ class Tree_Data {
 			)
 			: array();
 
+		// Read-only facts about the page from other plugins (an SEO plugin's
+		// title and description, for one), shown in the card. Card only, for
+		// the same N+1 reason as the edit links above, and gated on canEdit
+		// the same way: what a plugin stores about a page is often edit-only
+		// data (Simple SEO's fields are, in its own REST output).
+		$node['detailRows'] = $can_edit_this
+			? self::sanitize_detail_rows(
+				(array) apply_filters( 'cms_tree_page_view_detail_rows', array(), $id, $post )
+			)
+			: array();
+
 		$node['ancestors']  = $ancestors;
 		$node['excerpt']    = $can_edit_this ? self::admin_excerpt( $post ) : '';
 		$node['previewUrl'] = $can_edit_this ? self::preview_url( $post ) : '';
@@ -512,9 +523,9 @@ class Tree_Data {
 				continue;
 			}
 
-			$id    = isset( $link['id'] ) ? sanitize_key( (string) $link['id'] ) : '';
+			$id    = isset( $link['id'] ) && is_scalar( $link['id'] ) ? sanitize_key( (string) $link['id'] ) : '';
 			$label = isset( $link['label'] ) ? (string) $link['label'] : '';
-			$url   = isset( $link['url'] ) ? esc_url_raw( (string) $link['url'] ) : '';
+			$url   = isset( $link['url'] ) && is_scalar( $link['url'] ) ? esc_url_raw( (string) $link['url'] ) : '';
 
 			if ( '' === $id || '' === $label || '' === $url ) {
 				continue;
@@ -535,7 +546,7 @@ class Tree_Data {
 			$icon = isset( $link['icon'] ) && is_scalar( $link['icon'] ) ? (string) $link['icon'] : '';
 			$icon = 1 === strlen( $icon ) ? $icon : sanitize_key( $icon );
 
-			$position = isset( $link['position'] ) ? sanitize_key( (string) $link['position'] ) : '';
+			$position = isset( $link['position'] ) && is_scalar( $link['position'] ) ? sanitize_key( (string) $link['position'] ) : '';
 			if ( ! in_array( $position, array( 'row', 'card', 'both' ), true ) ) {
 				$position = 'card';
 			}
@@ -546,6 +557,52 @@ class Tree_Data {
 				'url'      => $url,
 				'icon'     => $icon,
 				'position' => $position,
+			);
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Validate and de-duplicate third-party detail rows.
+	 *
+	 * Like sanitize_edit_links(): nothing from the filter is trusted. Each entry
+	 * must be an array with a non-empty `id` and scalar, non-empty `label` and
+	 * `value`; anything else is dropped. Both texts are plain text — React
+	 * escapes them, so markup shows as markup rather than rendering — and are
+	 * run through wp_strip_all_tags() so a plugin handing over stored HTML reads
+	 * as text instead of tags. Duplicate ids collapse to the first registered.
+	 *
+	 * @param array<mixed> $rows Raw filter output.
+	 * @return list<array{id: string, label: string, value: string}>
+	 */
+	private static function sanitize_detail_rows( array $rows ): array {
+		$clean = array();
+		$seen  = array();
+
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			if ( ! isset( $row['id'], $row['label'], $row['value'] ) || ! is_scalar( $row['id'] ) || ! is_scalar( $row['label'] ) || ! is_scalar( $row['value'] ) ) {
+				continue;
+			}
+
+			$id    = sanitize_key( (string) $row['id'] );
+			$label = trim( wp_strip_all_tags( (string) $row['label'] ) );
+			$value = trim( wp_strip_all_tags( (string) $row['value'] ) );
+
+			if ( '' === $id || '' === $label || '' === $value || isset( $seen[ $id ] ) ) {
+				continue;
+			}
+
+			$seen[ $id ] = true;
+
+			$clean[] = array(
+				'id'    => $id,
+				'label' => $label,
+				'value' => $value,
 			);
 		}
 

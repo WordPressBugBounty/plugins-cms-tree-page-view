@@ -4,7 +4,7 @@
  * Plugin URI: https://eskapism.se/code-playground/cms-tree-page-view/
  * Description: Adds a CMS-like tree view of all your pages, like the view often found in a page-focused CMS. Use the tree view to edit, view, add pages and search pages (very useful if you have many pages). And with drag and drop you can rearrange the order of your pages. Page management won't get any easier than this!
  * Text Domain: cms-tree-page-view
- * Version: 2.5.2
+ * Version: 2.6.0
  * Requires at least: 6.6
  * Requires PHP: 7.4
  * Author: Pär Thernström
@@ -35,7 +35,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CMS_TPV_VERSION', '2.5.2' );
+define( 'CMS_TPV_VERSION', '2.6.0' );
 define( 'CMS_TPV_NAME', 'CMS Tree Page View' );
 
 require __DIR__ . '/functions.php';
@@ -103,6 +103,7 @@ add_action( 'admin_menu', 'cms_tpv_admin_menu' );
 add_action( 'current_screen', 'cms_tpv_add_tree_view_link_to_list_screen' );
 
 // Activation.
+// Retired capability, never checked (see Admin\Capabilities). Still defined for code that references it.
 define( 'CMS_TPV_MOVE_PERMISSION', 'move_cms_tree_view_page' );
 register_activation_hook( __FILE__, 'cms_tpv_install' );
 register_uninstall_hook( __FILE__, 'cms_tpv_uninstall' );

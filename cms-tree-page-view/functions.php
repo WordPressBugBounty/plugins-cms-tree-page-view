@@ -74,6 +74,38 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 
 /**
+ * Example: add read-only facts to a page's detail card.
+ *
+ * Signature: apply_filters( 'cms_tree_page_view_detail_rows', array $rows, int $page_id, WP_Post $post )
+ *
+ * Lets another plugin show what it knows about the selected page (an SEO
+ * title, a meta description) in the detail card, as label/value rows. Card
+ * only, never the tree rows, so a callback can read post meta without an
+ * N+1 across a tree level. Each entry is:
+ *
+ *     array(
+ *         'id'    => string, // required, sanitize_key()'d; duplicates collapse to the first
+ *         'label' => string, // required, translated by the integration
+ *         'value' => string, // required, plain text
+ *     )
+ *
+ * Entries missing a key, or with an empty label or value, are dropped:
+ * leave a row out rather than passing an empty value. Tags are stripped
+ * from both texts. Rows show in filter order, after the page preview.
+ *
+ * Only runs for a user who can edit the post.
+ *
+ *     add_filter( 'cms_tree_page_view_detail_rows', function ( $rows, $page_id ) {
+ *         $rows[] = array(
+ *             'id'    => 'my-plugin-status',
+ *             'label' => __( 'Review status', 'my-plugin' ),
+ *             'value' => get_post_meta( $page_id, '_my_review_status', true ),
+ *         );
+ *         return $rows;
+ *     }, 10, 2 );
+ */
+
+/**
  * Check if a post type is ignored.
  *
  * Back-compat shim: delegates to
@@ -554,15 +586,13 @@ function cms_tpv_render_welcome_notice() {
 }
 
 /**
- * Grant the tree-move capability to the administrator and editor roles.
+ * Used to grant the tree-move capability. The capability is retired (see
+ * CMS_Tree_Page_View\Admin\Capabilities), so this does nothing.
  *
- * Back-compat shim: delegates to CMS_Tree_Page_View\Admin\Capabilities::setup().
- *
- * @deprecated 1.8.0 Use CMS_Tree_Page_View\Admin\Capabilities::setup() instead.
+ * @deprecated 1.8.0 No replacement.
  */
 function cms_tvp_setup_caps() {
-	_deprecated_function( __FUNCTION__, '1.8.0', 'CMS_Tree_Page_View\Admin\Capabilities::setup()' );
-	\CMS_Tree_Page_View\Admin\Capabilities::setup();
+	_deprecated_function( __FUNCTION__, '1.8.0' );
 }
 
 /**

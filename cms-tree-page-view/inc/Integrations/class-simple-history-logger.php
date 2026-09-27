@@ -85,6 +85,53 @@ class Simple_History_Logger extends \Simple_History\Loggers\Logger {
 	}
 
 	/**
+	 * Links under each event (Simple History 5.24+; older versions never call
+	 * this): edit the page, and open the page tree with the page selected.
+	 *
+	 * "Page tree" is a bare destination label, per Simple History's action link
+	 * wording; the edit link keeps its verb, like Simple History's own post
+	 * events. No links for a page that is gone or trashed, and no tree link for
+	 * a post type without a tree (Menu::get_tree_view_url() returns '' then).
+	 *
+	 * @param object $row Log row, with the event's context in $row->context.
+	 * @return array<int, array{url: string, label: string, action: string}>
+	 */
+	public function get_action_links( $row ) {
+		$post_id = isset( $row->context['post_id'] ) ? (int) $row->context['post_id'] : 0;
+		$post    = $post_id ? get_post( $post_id ) : null;
+
+		if ( ! $post || 'trash' === $post->post_status || ! current_user_can( 'edit_post', $post_id ) ) {
+			return array();
+		}
+
+		$links = array();
+
+		$post_type_object = get_post_type_object( $post->post_type );
+		$edit_url         = (string) get_edit_post_link( $post_id, 'raw' );
+
+		if ( $post_type_object && '' !== $edit_url ) {
+			$links[] = array(
+				'url'    => $edit_url,
+				/* translators: %s: post type, like "page". */
+				'label'  => sprintf( __( 'Edit %s', 'cms-tree-page-view' ), strtolower( $post_type_object->labels->singular_name ) ),
+				'action' => 'edit',
+			);
+		}
+
+		$tree_url = \CMS_Tree_Page_View\Admin\Menu::get_tree_view_url( $post->post_type );
+
+		if ( '' !== $tree_url ) {
+			$links[] = array(
+				'url'    => add_query_arg( 'selected', $post_id, $tree_url ),
+				'label'  => __( 'Page tree', 'cms-tree-page-view' ),
+				'action' => 'view',
+			);
+		}
+
+		return $links;
+	}
+
+	/**
 	 * Log a completed move/reorder — see Tree_Mutations::move()'s docblock for
 	 * the hook's exact contract.
 	 *

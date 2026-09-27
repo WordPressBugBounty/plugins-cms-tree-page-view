@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.5.2
+Stable tag: 2.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -147,6 +147,17 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.6.0 (September 2026)
+
+#### Added
+
+- Page moves and additions in Simple History now link to the page's editor and to the page in the tree.
+- Developers: the `cms_tree_page_view_detail_rows` filter adds read-only rows to the selected page's card. Simple SEO uses it to show a page's SEO title and description.
+
+#### Removed
+
+- The `move_cms_tree_view_page` capability. It hasn't controlled anything for years (moving pages needs permission to edit them), so it's now removed from all roles.
 
 ### 2.5.2 (August 2026)
 

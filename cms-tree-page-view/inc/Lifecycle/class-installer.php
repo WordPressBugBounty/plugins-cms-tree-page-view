@@ -35,7 +35,7 @@ class Installer {
 	}
 
 	/**
-	 * Uninstall hook: remove the tree-move capability from the roles that had it,
+	 * Uninstall hook: remove the retired tree-move capability from any role,
 	 * and clean up the retired promo-box options (replaced by the permanent
 	 * "About this plugin" card — Admin\Promo::help_card()).
 	 */
@@ -50,8 +50,8 @@ class Installer {
 	 * On init, detect a plugin version change and run the upgrade routine.
 	 *
 	 * Compares the stored plugin version against the current one; a mismatch means
-	 * a fresh install or an upgrade, so bump the stored version and (re)grant the
-	 * move capability.
+	 * a fresh install or an upgrade, so bump the stored version and take the
+	 * retired move capability off the roles that still have it.
 	 */
 	public static function plugins_loaded() {
 		$installed_version = get_option( 'cms_tpv_version', 0 );
@@ -61,8 +61,8 @@ class Installer {
 			// New version — upgrade the stored version to the current one.
 			update_option( 'cms_tpv_version', CMS_TPV_VERSION );
 
-			// Set up caps/permissions.
-			Capabilities::setup();
+			// The move capability is retired; see Admin\Capabilities.
+			Capabilities::remove();
 		}
 	}
 }
