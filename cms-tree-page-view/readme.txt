@@ -68,6 +68,7 @@ If you want to always have a list of your pages available in your WordPress admi
 #### Donation and more plugins
 
 - These two plugins work nicely together: install my free [Simple History](https://simple-history.com/?utm_source=cms-tree-page-view&utm_medium=plugin&utm_campaign=cmstpv_readme) plugin and the tree will show you who recently moved, edited or added each page. On its own, Simple History is a complete activity log for your admin — logins (both failed and successful), post and page edits, plugin updates, user changes and more — so you can always see what happened on your site, and when.
+- Using my [Simple SEO](https://wordpress.org/plugins/simple-seo/) plugin? The page card in the tree shows each page's SEO title and description.
 - If you like this plugin don't forget to [donate to support further development](https://eskapism.se/sida/donate/).
 
 ## Installation
@@ -153,7 +154,7 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 #### Added
 
 - Page moves and additions in Simple History now link to the page's editor and to the page in the tree.
-- Developers: the `cms_tree_page_view_detail_rows` filter adds read-only rows to the selected page's card. Simple SEO uses it to show a page's SEO title and description.
+- Developers: the `cms_tree_page_view_detail_rows` filter adds read-only rows to the selected page's card. [Simple SEO](https://wordpress.org/plugins/simple-seo/) uses it to show a page's SEO title and description.
 
 #### Removed
 
