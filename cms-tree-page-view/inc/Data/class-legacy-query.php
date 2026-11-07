@@ -359,19 +359,51 @@ class Legacy_Query {
 		global $wpdb;
 
 		// Resolve which posts the shift touches *before* changing menu_order — the WHERE
-		// may filter on menu_order itself — so the right caches get invalidated.
+		// may filter on menu_order itself — then shift exactly those.
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE {$where}", $where_args ) );
+		$ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE {$where}", $where_args ) ) );
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
-		$wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->posts} SET menu_order = menu_order + %d WHERE {$where}", array_merge( array( $delta ), $where_args ) ) );
-
-		$ids = array_map( 'intval', $ids );
-
-		foreach ( $ids as $id ) {
-			clean_post_cache( $id );
-		}
+		self::bump_menu_order_for_ids( $ids, $delta );
 
 		return $ids;
+	}
+
+	/**
+	 * Add $delta to the menu_order of the given posts: one UPDATE per chunk of
+	 * IDs, no save hooks, post_modified untouched. The cache is cleaned in bulk
+	 * (drop the post objects, bump the posts last_changed key), see
+	 * bump_menu_order() for why it must be cleaned at all.
+	 *
+	 * @param int[] $post_ids Post IDs.
+	 * @param int   $delta    Amount to add to each menu_order.
+	 * @return bool False if an UPDATE failed (some posts may already be shifted).
+	 */
+	public static function bump_menu_order_for_ids( $post_ids, $delta ) {
+
+		global $wpdb;
+
+		if ( empty( $post_ids ) ) {
+			return true;
+		}
+
+		$ok = true;
+
+		foreach ( array_chunk( $post_ids, 500 ) as $chunk ) {
+			$placeholders = implode( ',', array_fill( 0, count( $chunk ), '%d' ) );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$result = $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->posts} SET menu_order = menu_order + %d WHERE ID IN ( {$placeholders} )", array_merge( array( (int) $delta ), $chunk ) ) );
+
+			if ( false === $result ) {
+				$ok = false;
+				break;
+			}
+		}
+
+		// Clean even after a failure: earlier chunks did change.
+		wp_cache_delete_multiple( $post_ids, 'posts' );
+		wp_cache_set_posts_last_changed();
+
+		return $ok;
 	}
 }

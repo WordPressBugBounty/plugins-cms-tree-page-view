@@ -125,8 +125,8 @@ class Tree_Mutations {
 		// Renumber the other siblings to their new slots. Only the ones whose
 		// menu_order actually changed are written, and via a direct column update
 		// (not wp_update_post) so a pure reorder doesn't bump their modified dates
-		// or fire a save_post storm — matching cms_tpv_bump_menu_order()'s own
-		// cache-safe write. Prime the sibling caches once so the current-order
+		// or fire a save_post storm (same idea as
+		// Legacy_Query::bump_menu_order_for_ids()). Prime the sibling caches once so the current-order
 		// lookup below reads from cache (the id-only get_posts above doesn't fill
 		// the post cache), then skip any sibling already sitting in its target slot
 		// — a drag near the top of a large level leaves most rows untouched, so
@@ -210,8 +210,7 @@ class Tree_Mutations {
 	/**
 	 * Set a post's menu_order via a direct column write + cache clean, without
 	 * firing wp_update_post() (so a pure reorder leaves post_modified and the
-	 * save_post hooks untouched). Mirrors cms_tpv_bump_menu_order()'s cache-safe
-	 * write; used by move() to renumber a level's siblings.
+	 * save_post hooks untouched). Used by move() to renumber a level's siblings.
 	 *
 	 * @param int $post_id    Post ID.
 	 * @param int $menu_order New menu_order.
@@ -262,12 +261,6 @@ class Tree_Mutations {
 			return $root_result;
 		}
 
-		// Mirror the legacy cms_tpv_add_pages(): keep post_author/post_modified
-		// stable on the menu_order "make room" updates below. add_filter is
-		// idempotent for an identical callback + priority (it runs once), so the
-		// legacy AJAX handler adding the same filter too is harmless.
-		add_filter( 'wp_insert_post_data', 'cms_tpv_insert_post_data', 99, 2 );
-
 		$post_position = $position;
 
 		// Remove possibly empty posts.
@@ -307,7 +300,7 @@ class Tree_Mutations {
 		// unrelated DB order, so the loop below could decide a sibling had "passed"
 		// the reference page when visually it hadn't, bumping the wrong posts and
 		// dropping the new page one slot off from where the user actually released it.
-		$args  = array(
+		$args        = array(
 			'post_status'      => 'any',
 			'post_type'        => $ref_post->post_type,
 			'numberposts'      => -1,
@@ -316,42 +309,34 @@ class Tree_Mutations {
 			'order'            => 'asc',
 			'post_parent'      => $post_parent,
 			'suppress_filters' => false,
+			'fields'           => 'ids',
 		);
-		$posts = get_posts( $args );
+		$sibling_ids = array_map( 'intval', get_posts( $args ) );
 
 		$new_menu_order = 0;
 
 		// If posts exist at this level, make room by increasing the menu order.
-		if ( count( $posts ) > 0 ) {
+		if ( count( $sibling_ids ) > 0 ) {
 
 			if ( 'after' === $post_position ) {
 
-				$has_passed_ref_post = false;
-				foreach ( $posts as $one_post ) {
+				// +1 beyond $arr_post_names_count (not just enough room for the new
+				// pages): a following sibling can share $ref_post's own menu_order
+				// (ties are common — new pages default to 0), so bumping by exactly
+				// the new-page count would leave it tied with the last new page
+				// instead of unambiguously after it.
+				$ref_index     = array_search( (int) $ref_post->ID, $sibling_ids, true );
+				$following_ids = false === $ref_index ? array() : array_slice( $sibling_ids, $ref_index + 1 );
 
-					if ( $has_passed_ref_post ) {
-
-						// +1 beyond $arr_post_names_count (not just enough room for the
-						// new pages): a following sibling can share $ref_post's own
-						// menu_order (ties are common — new pages default to 0), so
-						// bumping by exactly the new-page count would leave it tied
-						// with the last new page instead of unambiguously after it —
-						// mirrors Tree_Mutations::move()'s own "+1 extra for tie
-						// safety" bump.
-						$post_update = array(
-							'ID'                => $one_post->ID,
-							'menu_order'        => $one_post->menu_order + $arr_post_names_count + 1,
-							'post_author'       => (int) $one_post->post_author,
-							'post_modified'     => $one_post->post_modified,
-							'post_modified_gmt' => $one_post->post_modified_gmt,
-						);
-						wp_update_post( $post_update );
-
-					}
-
-					if ( ! $has_passed_ref_post && $ref_post->ID === $one_post->ID ) {
-						$has_passed_ref_post = true;
-					}
+				// Don't insert into a level we couldn't make room in: the new
+				// pages would tie with, or land before, the siblings that
+				// didn't move. The REST caller reports an empty result as a
+				// failed add.
+				if ( ! Legacy_Query::bump_menu_order_for_ids( $following_ids, $arr_post_names_count + 1 ) ) {
+					return array(
+						'created'   => array(),
+						'post_type' => $ref_post->post_type,
+					);
 				}
 
 				$new_menu_order = $ref_post->menu_order;
@@ -367,7 +352,7 @@ class Tree_Mutations {
 				// AFTER $posts[0] alphabetically, defeating "place at the very
 				// beginning". Mirrors the "after" branch's own tie-safety margin
 				// above.
-				$new_menu_order = $posts[0]->menu_order - $arr_post_names_count - 1;
+				$new_menu_order = get_post( $sibling_ids[0] )->menu_order - $arr_post_names_count - 1;
 
 			}
 		}
@@ -454,8 +439,6 @@ class Tree_Mutations {
 				'post_type' => '',
 			);
 		}
-
-		add_filter( 'wp_insert_post_data', 'cms_tpv_insert_post_data', 99, 2 );
 
 		$post_status = Legacy_Query::resolve_new_post_status( $status, $post_type_object );
 

@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.6.0
+Stable tag: 2.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -149,6 +149,23 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 
 ## Changelog
 
+### 2.7.0 (November 2026)
+
+#### Added
+
+- Move to top and Move to bottom buttons in the page card, next to the up and down arrows.
+
+#### Changed
+
+- The page card's move buttons are disabled when the page is already first or last.
+- After a move from the page card, the tree scrolls to keep the moved page in view.
+
+#### Fixed
+
+- Adding a page near the top of a long list is much faster (about 40 seconds down to 2 with 3000 sibling pages).
+- Dragging a page to the top or bottom edge of the tree now scrolls the tree, so pages can be moved further than one screenful.
+- The drop line and drop highlight now follow the pointer without lag on sites with thousands of pages.
+
 ### 2.6.0 (September 2026)
 
 #### Added
@@ -222,56 +239,8 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 
 - A page you cannot edit no longer shows a pointer cursor as though its title were a link.
 
-### 2.3.1 (August 2026)
-
-#### Added
-
-- Password-protected pages are marked with a padlock again, in the tree, the dashboard widget, and the page details card.
-
-#### Fixed
-
-- Users who can only edit their own pages see the tree again. It lists every published page plus their own drafts, instead of coming up empty.
-- The status filter tabs count the pages the tree actually shows, so a tab can no longer say "All (18)" above an empty tree.
-- Page titles in the tree no longer carry the front-end "Protected:" and "Private:" prefixes.
-- The tree no longer offers a drag or an "Add page after" on a page you cannot edit, where the action could only fail.
-
-#### Security
-
-- Adding a page after another page now requires permission to edit that page, since it renumbers the pages around it.
-
-### 2.3.0 (August 2026)
-
-#### Changed
-
-- The whole "Open full tree" footer in the dashboard widget is now clickable, including the line of text under it.
-
-#### Fixed
-
-- Dashboard widget links no longer fail with "Sorry, you do not have permission to access this page" for a post type that is enabled on the dashboard but not in the menu.
-
-#### Security
-
-- The tree's REST API now answers only for the post types the tree shows. A crafted request for a revision, attachment, or other internal post type no longer returns page details or accepts a move.
-
-### 2.2.0 (July 2026)
-
-#### Fixed
-
-- Right-click (or ⌘/Ctrl/middle-click) a page title in the tree to open its editor in a new tab again — titles are real links once more.
-
-### 2.1.0 (July 2026)
-
-#### Added
-
-- "Edit in Elementor" is back — pages built with Elementor show an editor link in the tree's detail card.
-- New `cms_tree_page_view_post_edit_links` filter lets any page builder add its own edit link to the tree.
-
-#### Fixed
-
-- The tree view is now usable on phones and small screens — it no longer overflows sideways or stretches into an endlessly tall page, and tapping a page brings its details into view.
-
 ### Older versions
 
-The changelog for all previous releases (1.7.1 and earlier, back to the first release in 2010) is in [changelog.txt](changelog.txt), included with the plugin.
+The changelog for all previous releases (2.3.1 and earlier, back to the first release in 2010) is in [changelog.txt](changelog.txt), included with the plugin.
 
 ysaetf7ruhjnm3e2x4tbtletpc35ckeb
