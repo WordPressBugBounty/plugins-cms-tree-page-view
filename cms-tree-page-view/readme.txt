@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.7.0
+Stable tag: 2.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -148,6 +148,13 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.7.1 (November 2026)
+
+#### Fixed
+
+- The dashboard widget now says when it couldn't load the pages, with a Retry, instead of showing "No pages found.".
+- On touch screens the dashboard widget's Edit and View buttons are always shown, and the tree no longer reserves empty space for buttons a finger can't reveal.
 
 ### 2.7.0 (November 2026)
 
