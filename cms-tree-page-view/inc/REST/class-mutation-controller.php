@@ -402,10 +402,11 @@ class Mutation_Controller extends WP_REST_Controller {
 
 		// Return the level the new pages joined so the client swaps its optimistic
 		// placeholder for the real page(s) without a separate read round trip.
+		$view   = (string) $request->get_param( 'view' );
 		$levels = Tree_Data::get_levels(
 			array( $parent ),
 			(string) $result['post_type'],
-			(string) $request->get_param( 'view' )
+			$view
 		);
 
 		return rest_ensure_response(
@@ -413,8 +414,45 @@ class Mutation_Controller extends WP_REST_Controller {
 				'created'  => $result['created'],
 				'postType' => $result['post_type'],
 				'levels'   => $levels,
+				'hidden'   => 'all' === $view ? self::created_missing_from_level( $result['created'], $levels, $parent ) : array(),
 			)
 		);
+	}
+
+	/**
+	 * Created pages that the level they joined does not list.
+	 *
+	 * The page exists, but something filtering the page listing (a multilingual or
+	 * permissions plugin hooking `get_pages`/`posts_where`) leaves it out, so the tree
+	 * would drop it without a word (CTPV-65). Only meaningful for the `all` view: the
+	 * other views legitimately leave out a new draft.
+	 *
+	 * @param int[]                                                       $created Created post IDs.
+	 * @param list<array{parent: int, nodes: list<array<string, mixed>>}> $levels  Levels from Tree_Data::get_levels().
+	 * @param int                                                         $parent_id Parent the pages joined.
+	 * @return int[] IDs missing from the level, in creation order.
+	 */
+	private static function created_missing_from_level( array $created, array $levels, int $parent_id ): array {
+		$listed = array();
+
+		foreach ( $levels as $level ) {
+			if ( (int) $level['parent'] !== $parent_id ) {
+				continue;
+			}
+
+			foreach ( $level['nodes'] as $node ) {
+				$listed[ (int) $node['id'] ] = true;
+			}
+		}
+
+		$missing = array();
+		foreach ( $created as $id ) {
+			if ( ! isset( $listed[ (int) $id ] ) ) {
+				$missing[] = (int) $id;
+			}
+		}
+
+		return $missing;
 	}
 
 	/**

@@ -7,7 +7,7 @@ Text Domain: cms-tree-page-view
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.7.1
+Stable tag: 2.7.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -148,6 +148,19 @@ Dragging a page to a _different_ level in the hierarchy (making it a child of an
 8. Switch between the regular list view and the tree view in one click.
 
 ## Changelog
+
+### 2.7.3 (November 2026)
+
+#### Fixed
+
+- Creating a page another plugin hides no longer looks like a failed save.
+- The hidden page notice is no longer an error and fits posts and custom post types.
+
+### 2.7.2 (November 2026)
+
+#### Fixed
+
+- A new page that another plugin (such as WPML or PublishPress Permissions) hides from the tree now shows a notice instead of silently disappearing.
 
 ### 2.7.1 (November 2026)
 
